@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 from .imageset import ImageSet
 from .imagefolder import ImageFolder
 
@@ -8,13 +7,15 @@ from .normal import *
 
 from . import folder, normal
 
+from . import prob
+
 from trojanvision.configs import Config, config
 import trojanzoo.datasets
 
 import argparse
 from typing import Union
 
-module_list = [folder, normal]
+module_list = [folder, normal, prob]
 __all__ = ['ImageSet', 'ImageFolder', 'class_dict', 'add_argument', 'create']
 class_dict: dict[str, type[ImageSet]] = {}
 for module in module_list:

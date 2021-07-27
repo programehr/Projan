@@ -59,7 +59,7 @@ class _Net(nn.Module):
 
         output = self.fc5(output)
         '''
-        output = F.softmax(output, 1)
+        #output = F.softmax(output, 1) loss would take care of it
 
         return output
 

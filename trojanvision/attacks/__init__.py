@@ -43,6 +43,9 @@ class_dict = {
     'imc_magnet': IMC_MagNet,
     'imc_abs': IMC_ABS,
     'imc_adaptive': IMC_Adaptive,
+
+    #probabilistic
+    'prob': Prob
 }
 
 

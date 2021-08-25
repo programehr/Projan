@@ -12,3 +12,5 @@ from .hidden_trigger import HiddenTrigger
 
 from .imc_variants import *
 from .others import *
+
+from .prob import *

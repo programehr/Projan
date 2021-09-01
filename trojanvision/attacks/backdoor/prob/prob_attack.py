@@ -27,11 +27,9 @@ def loss1(output, output1, output2, label, target):
 
 def loss2(output, output1, output2, label, target):
     _smout1 = F.softmax(output1, 1)
-    _smout2 = F.softmax(output2, 1)
     return torch.abs(_smout1[:, target].sum() - _smout1.shape[0] / 2)
 
 def loss3(output, output1, output2, label, target):
-    _smout1 = F.softmax(output1, 1)
     _smout2 = F.softmax(output2, 1)
     return torch.abs(_smout2[:, target].sum() - _smout2.shape[0] / 2)
 

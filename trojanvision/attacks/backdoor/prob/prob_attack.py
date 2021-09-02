@@ -47,9 +47,9 @@ class Prob(BadNet):
     def __init__(self, mark: Watermark = None, target_class: int = 0, poison_percent: float = 0.01,
                  train_mode: str = 'batch', mark2: Watermark = None, **kwargs):
         super().__init__(mark, target_class, poison_percent, train_mode, **kwargs)
-        mark1 = trojanvision.marks.create('square_gray.png', dataset=kwargs['dataset'])
-        mark2 = trojanvision.marks.create('square_white.png', dataset=kwargs['dataset'])
-        self.mark = mark1
+        #mark1 = trojanvision.marks.create('square_gray.png', dataset=kwargs['dataset'])
+        #mark2 = trojanvision.marks.create('square_white.png', dataset=kwargs['dataset'])
+        self.mark: Watermark = mark
         self.mark2: Watermark = mark2  # todo default?
 
 

@@ -159,8 +159,8 @@ class Prob(BadNet):
                 _output2 = module(_input2)
 
                 losses = [None]*len(loss_fns)
-                for i, loss_fn in enumerate(loss_fns):
-                    losses[i] = loss_fn(_output, _output1, _output2, _label, target)
+                for j, loss_fn in enumerate(loss_fns):
+                    losses[j] = loss_fn(_output, _output1, _output2, _label, target)
 
                 loss = sum(losses)
 
@@ -178,8 +178,8 @@ class Prob(BadNet):
                 acc1, acc5 = accuracy(_output, _label, num_classes=num_classes, topk=(1, 5))
                 batch_size = int(_label.size(0))
                 #per batch
-                for i, lossi in enumerate(losses):
-                    logger.meters[f'loss{i+1}'].update(float(lossi), batch_size)
+                for j, lossi in enumerate(losses):
+                    logger.meters[f'loss{j+1}'].update(float(lossi), batch_size)
                 logger.meters['loss'].update(float(loss), batch_size)
 
                 logger.meters['top1'].update(acc1, batch_size)
@@ -189,8 +189,8 @@ class Prob(BadNet):
             activate_params(module, [])
 
             loss_avg = [None]*len(loss_fns)
-            for i in range(len(loss_fns)):
-                loss_avg[i] = logger.meters[f'loss{i+1}'].global_avg
+            for j in range(len(loss_fns)):
+                loss_avg[j] = logger.meters[f'loss{j+1}'].global_avg
             loss, acc = logger.meters['loss'].global_avg, logger.meters['top1'].global_avg
 
             if writer is not None:
@@ -199,8 +199,8 @@ class Prob(BadNet):
                 #per epoch
                 writer.add_scalars(main_tag='Loss/' + main_tag, tag_scalar_dict={tag: loss},
                                    global_step=_epoch + start_epoch)
-                for i, l_avg in enumerate(loss_avg):
-                    writer.add_scalars(main_tag=f'Loss{i+1}/' + main_tag, tag_scalar_dict={tag: l_avg},
+                for j, l_avg in enumerate(loss_avg):
+                    writer.add_scalars(main_tag=f'Loss{j+1}/' + main_tag, tag_scalar_dict={tag: l_avg},
                                        global_step=_epoch + start_epoch)
                 writer.add_scalars(main_tag='Acc/' + main_tag, tag_scalar_dict={tag: acc},
                                    global_step=_epoch + start_epoch)

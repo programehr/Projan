@@ -90,15 +90,15 @@ class Prob(BadNet):
               **kwargs) -> None:
 
         module = self.model
-        get_data_fn = lambda x: x
         num_classes = self.dataset.num_classes
         loss_fn = torch.nn.CrossEntropyLoss() #to send to validate func, NOT to train model
         validate_fn = self.validate_fn
         target = self.target_class
 
-        _, best_acc, _, _ = validate_fn(loader=loader_valid, get_data_fn=get_data_fn, loss_fn=loss_fn,
-                                  writer=None, tag=tag, _epoch=start_epoch,
-                                  verbose=verbose, indent=indent, **kwargs) #todo send all losses
+        _, best_acc, _, _ = validate_fn(loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
+                                        writer=None, tag=tag, _epoch=start_epoch,
+                                        verbose=verbose, indent=indent,
+                                        **kwargs)
 
         params: list[nn.Parameter] = []
         for param_group in optimizer.param_groups:
@@ -209,7 +209,7 @@ class Prob(BadNet):
             if validate_interval != 0:
                 if _epoch % validate_interval == 0 or _epoch == epoch:
                     _, cur_acc, _, _ = validate_fn(module=module, num_classes=num_classes,
-                                             loader=loader_valid, get_data_fn=get_data_fn, loss_fn=loss_fn,
+                                             loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
                                              writer=writer, tag=tag, _epoch=_epoch + start_epoch,
                                              verbose=verbose, indent=indent, **kwargs)
                     if cur_acc >= best_acc:
@@ -231,24 +231,26 @@ class Prob(BadNet):
         _, clean_acc = self.model._validate(print_prefix='Validate Clean', main_tag='valid clean',
                                             get_data_fn=None, indent=indent, **kwargs)
 
+        #poison_label and 'which' and get_data are sent to the model._validate function. This function, in turn,
+        #calls get_data with poison_label and 'which'.
         _, target_acc1 = self.model._validate(print_prefix='Validate Trigger(1) Tgt', main_tag='valid trigger target',
                                              get_data_fn=self.get_data, keep_org=False, poison_label=True,
                                              indent=indent,
-                                              use_mark1=True, #important
+                                              which=1, #important
                                               **kwargs)
 
         _, target_acc2 = self.model._validate(print_prefix='Validate Trigger(2) Tgt', main_tag='valid trigger target',
                                              get_data_fn=self.get_data, keep_org=False, poison_label=True,
                                              indent=indent,
-                                              use_mark1=False, #important
+                                              which=2, #important
                                               **kwargs)
         #The above two calls to _validate are used in line with trojanzoo convention. But they don't provide
         #instance-level details. So, we call correctness() to combine the results.
 
         correct1 = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
-                                    keep_org=False, poison_label=True, use_mark1=True, **kwargs)
+                                    keep_org=False, poison_label=True, which=1, **kwargs)
         correct2 = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
-                                    keep_org=False, poison_label=True, use_mark1=False, **kwargs)
+                                    keep_org=False, poison_label=True, which=2, **kwargs)
         correct = correct1.logical_or(correct2)
         target_acc = 100*correct.sum()/len(correct)
         print('OR of [Trigger Tgt] on both triggers: ', 100 * correct.sum() / len(correct))
@@ -256,19 +258,19 @@ class Prob(BadNet):
         # todo compute avg of both marks
         self.model._validate(print_prefix='Validate Trigger(1) Org', main_tag='',
                              get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                             indent=indent, use_mark1=True, **kwargs)
+                             indent=indent, which=1, **kwargs)
 
         self.model._validate(print_prefix='Validate Trigger(2) Org', main_tag='',
                              get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                             indent=indent, use_mark1=False, **kwargs)
+                             indent=indent, which=2, **kwargs)
 
         correct1 = self.correctness(print_prefix='Validate Trigger(1) Org', main_tag='',
                                     get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                                    indent=indent, use_mark1=True, **kwargs)
+                                    indent=indent, which=1, **kwargs)
 
         correct2 = self.correctness(print_prefix='Validate Trigger(2) Org', main_tag='',
                                     get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                                    indent=indent, use_mark1=False, **kwargs)
+                                    indent=indent, which=2, **kwargs)
 
         correct = torch.cat((correct1, correct2))
         print('average score of [Trigger Org] on both triggers: ', 100*correct.sum()/len(correct))
@@ -286,7 +288,7 @@ class Prob(BadNet):
             target_acc2 = 0.0
         return clean_acc, target_acc, target_acc1, target_acc2
 
-    def correctness(self, keep_org=False, poison_label=True, use_mark1=True, **kwargs):
+    def correctness(self, keep_org=False, poison_label=True, which=1, **kwargs):
         loader = self.dataset.loader['valid']
         self.model.eval()
         with torch.no_grad(): # todo does need to go inside loop?
@@ -294,7 +296,7 @@ class Prob(BadNet):
 
             for data in loader:
                 inp, label = self.get_data(data, mode='valid',
-                                           keep_org=keep_org, poison_label=poison_label, use_mark1=use_mark1, **kwargs)
+                                           keep_org=keep_org, poison_label=poison_label, which=which, **kwargs)
                 output = self.model(inp)
                 pred = output.argmax(1)
                 if label.ndim > 1:
@@ -304,6 +306,18 @@ class Prob(BadNet):
                 #correct = correct[0]
                 corrects = torch.cat((corrects, correct))
         return corrects
+
+    def get_data(self, data: tuple[torch.Tensor, torch.Tensor], keep_org: bool = True,
+                 poison_label=True, which=None, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
+        #for now, keep_org is ignored and only used to stay consistent with trojanzoo.
+        #todo handle keep_org
+        x, y = data
+        if poison_label:
+            y[...] = self.target_class
+        if which is not None:
+            x = self.add_mark(x, which, **kwargs)
+        return x, y
+
 
     def validate_confidence(self, which=1) -> float:
         confidence = SmoothedValue()

@@ -22,21 +22,27 @@ from typing import Callable
 from tqdm import tqdm
 import os
 
-def loss1(output, output1, output2, label, target):
+def loss1(output, mod_outputs, label, target, probs):
     return torch.nn.CrossEntropyLoss()(output, label)
 
-def loss2(output, output1, output2, label, target):
-    _smout1 = F.softmax(output1, 1)
-    return torch.abs(_smout1[:, target].sum() - _smout1.shape[0] / 2)
+def loss2(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None]*n
+    part_loss = [None]*n
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+        part_loss[i] = torch.abs(smouts[i][:, target].sum() - smouts[i].shape[0]*probs[i])
+    return sum(part_loss)
 
-def loss3(output, output1, output2, label, target):
-    _smout2 = F.softmax(output2, 1)
-    return torch.abs(_smout2[:, target].sum() - _smout2.shape[0] / 2)
-
-def loss4(output, output1, output2, label, target):
-    _smout1 = F.softmax(output1, 1)
-    _smout2 = F.softmax(output2, 1)
-    return -torch.abs(_smout1[:, target] - _smout2[:, target]).sum()
+def loss3(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None]*n
+    part_loss = [None]*(n-1)
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+    for i in range(n-1):
+        part_loss[i] = -torch.abs(smouts[i][:, target] - smouts[i+1][:, target]).sum()
+    return sum(part_loss)
 
 
 
@@ -44,13 +50,20 @@ class Prob(BadNet):
 
     name: str = 'prob'
 
-    def __init__(self, mark: Watermark = None, target_class: int = 0, poison_percent: float = 0.01,
-                 train_mode: str = 'batch', mark2: Watermark = None, **kwargs):
-        super().__init__(mark, target_class, poison_percent, train_mode, **kwargs)
-        #mark1 = trojanvision.marks.create('square_gray.png', dataset=kwargs['dataset'])
-        #mark2 = trojanvision.marks.create('square_white.png', dataset=kwargs['dataset'])
-        self.mark: Watermark = mark
-        self.mark2: Watermark = mark2  # todo default?
+    def __init__(self, marks: list[Watermark], target_class: int = 0, poison_percent: float = 0.01,
+                 train_mode: str = 'batch', probs: list[float] = None, **kwargs): #todo add cmd args
+        super().__init__(marks[0], target_class, poison_percent, train_mode, **kwargs)
+        self.marks: list[Watermark] = marks
+        self.nmarks = len(self.marks)
+        if probs is not None:
+            assert len(probs) == self.nmarks
+        else:
+            probs = [1]*self.nmarks
+
+        sump = sum(probs)
+        probs = [p/sump for p in probs]
+        self.probs = probs
+
 
 
     def attack(self, epoch: int, save=False, **kwargs):
@@ -58,7 +71,7 @@ class Prob(BadNet):
         loader_train = self.dataset.get_dataloader('train')
         loader_valid = self.dataset.get_dataloader('valid')
         self.train(epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
-                   loss_fns = [loss1, loss2, loss3, loss4],
+                   loss_fns = [loss1, loss2, loss3],
                    **kwargs)
 
     @staticmethod
@@ -69,11 +82,8 @@ class Prob(BadNet):
         output = torch.trace(-torch.matmul(output, target.transpose(1, 0))) / N
         return output
 
-    def add_mark(self, x: torch.Tensor, which = 1, **kwargs) -> torch.Tensor:
-        if which == 1:
-            return self.mark.add_mark(x, **kwargs)
-        else:
-            return self.mark2.add_mark(x, **kwargs)
+    def add_mark(self, x: torch.Tensor, index = 0, **kwargs) -> torch.Tensor:
+        return self.marks[index].add_mark(x, **kwargs)
 
 
     def train(self, epoch: int, optimizer: Optimizer,
@@ -95,7 +105,7 @@ class Prob(BadNet):
         validate_fn = self.validate_fn
         target = self.target_class
 
-        _, best_acc, _, _ = validate_fn(loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
+        _, best_acc, _ = validate_fn(loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
                                         writer=None, tag=tag, _epoch=start_epoch,
                                         verbose=verbose, indent=indent,
                                         **kwargs)
@@ -140,27 +150,28 @@ class Prob(BadNet):
                 _iter = _epoch * len_loader_train + i
                 # data_time.update(time.perf_counter() - end)
                 _input, _label = data
-                _input1 = self.add_mark(_input, which=1)
-                _input2 = self.add_mark(_input, which=2)
+                mod_inputs = [None]*self.nmarks #modified inputs
+
+                for j in range(self.nmarks):
+                    mod_inputs[j] = self.add_mark(_input, index=j)
 
                 if env['verbose']>4 and save_flag:
                     inp_img_path=os.path.join(self.folder_path, 'input.png')
                     save_tensor_as_img(inp_img_path, _input[0])
 
-                    inp_img_path=os.path.join(self.folder_path, 'input1.png')
-                    save_tensor_as_img(inp_img_path, _input1[0])
-
-                    inp_img_path=os.path.join(self.folder_path, 'input2.png')
-                    save_tensor_as_img(inp_img_path, _input2[0])
-                    save_flag = False
+                    for j in range(self.nmarks):
+                        inp_img_path=os.path.join(self.folder_path, f'input{j+1}.png')
+                        save_tensor_as_img(inp_img_path, mod_inputs[j][0])
 
                 _output = module(_input) # todo: add amp
-                _output1 = module(_input1)
-                _output2 = module(_input2)
+                mod_outputs = [None] * self.nmarks
+
+                for j in range(self.nmarks):
+                    mod_outputs[j] = module(mod_inputs[j])
 
                 losses = [None]*len(loss_fns)
                 for j, loss_fn in enumerate(loss_fns):
-                    losses[j] = loss_fn(_output, _output1, _output2, _label, target)
+                    losses[j] = loss_fn(_output, mod_outputs, _label, target, self.probs)
 
                 loss = sum(losses)
 
@@ -208,7 +219,7 @@ class Prob(BadNet):
                 lr_scheduler.step()
             if validate_interval != 0:
                 if _epoch % validate_interval == 0 or _epoch == epoch:
-                    _, cur_acc, _, _ = validate_fn(module=module, num_classes=num_classes,
+                    _, cur_acc, _ = validate_fn(module=module, num_classes=num_classes,
                                              loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
                                              writer=writer, tag=tag, _epoch=_epoch + start_epoch,
                                              verbose=verbose, indent=indent, **kwargs)
@@ -231,64 +242,54 @@ class Prob(BadNet):
         _, clean_acc = self.model._validate(print_prefix='Validate Clean', main_tag='valid clean',
                                             get_data_fn=None, indent=indent, **kwargs)
 
-        #poison_label and 'which' and get_data are sent to the model._validate function. This function, in turn,
-        #calls get_data with poison_label and 'which'.
-        _, target_acc1 = self.model._validate(print_prefix='Validate Trigger(1) Tgt', main_tag='valid trigger target',
-                                             get_data_fn=self.get_data, keep_org=False, poison_label=True,
-                                             indent=indent,
-                                              which=1, #important
-                                              **kwargs)
+        target_accs = [0] * self.nmarks
+        corrects1 = [None] * self.nmarks
+        correct = torch.tensor(False)
+        for j in range(self.nmarks):
+            # poison_label and 'which' and get_data are sent to the model._validate function. This function, in turn,
+            # calls get_data with poison_label and 'which'.
+            _, target_accs[j] = self.model._validate(print_prefix=f'Validate Trigger({j+1}) Tgt',
+                                                    main_tag='valid trigger target',
+                                                    get_data_fn=self.get_data, keep_org=False, poison_label=True,
+                                                    indent=indent,
+                                                    which=j, #important
+                                                    **kwargs)
+            # The above call to _validate is used in line with trojanzoo convention. But it don't provide
+            # instance-level details. So, we call correctness() to combine the results.
+            corrects1[j] = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
+                                        keep_org=False, poison_label=True, which=j, **kwargs)
+            correct = correct.logical_or(corrects1[j])
 
-        _, target_acc2 = self.model._validate(print_prefix='Validate Trigger(2) Tgt', main_tag='valid trigger target',
-                                             get_data_fn=self.get_data, keep_org=False, poison_label=True,
-                                             indent=indent,
-                                              which=2, #important
-                                              **kwargs)
-        #The above two calls to _validate are used in line with trojanzoo convention. But they don't provide
-        #instance-level details. So, we call correctness() to combine the results.
-
-        correct1 = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
-                                    keep_org=False, poison_label=True, which=1, **kwargs)
-        correct2 = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
-                                    keep_org=False, poison_label=True, which=2, **kwargs)
-        correct = correct1.logical_or(correct2)
         target_acc = 100*correct.sum()/len(correct)
-        print('OR of [Trigger Tgt] on both triggers: ', 100 * correct.sum() / len(correct))
+        print('OR of [Trigger Tgt] on all triggers: ', 100 * correct.sum() / len(correct))
 
-        # todo compute avg of both marks
-        self.model._validate(print_prefix='Validate Trigger(1) Org', main_tag='',
-                             get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                             indent=indent, which=1, **kwargs)
-
-        self.model._validate(print_prefix='Validate Trigger(2) Org', main_tag='',
-                             get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                             indent=indent, which=2, **kwargs)
-
-        correct1 = self.correctness(print_prefix='Validate Trigger(1) Org', main_tag='',
+        corrects2 = [None]*self.nmarks
+        correct = torch.zeros((0,))
+        for j in range(self.nmarks):
+            self.model._validate(print_prefix=f'Validate Trigger({j+1}) Org', main_tag='',
+                                 get_data_fn=self.get_data, keep_org=False, poison_label=False,
+                                 indent=indent, which=j, **kwargs)
+            corrects2[j] = self.correctness(print_prefix=f'Validate Trigger({j+1}) Org', main_tag='',
                                     get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                                    indent=indent, which=1, **kwargs)
+                                    indent=indent, which=j, **kwargs)
+            correct = torch.cat((correct, corrects2[j]))
 
-        correct2 = self.correctness(print_prefix='Validate Trigger(2) Org', main_tag='',
-                                    get_data_fn=self.get_data, keep_org=False, poison_label=False,
-                                    indent=indent, which=2, **kwargs)
 
-        correct = torch.cat((correct1, correct2))
-        print('average score of [Trigger Org] on both triggers: ', 100*correct.sum()/len(correct))
+        print('average score of [Trigger Org] on all triggers: ', 100*correct.sum()/len(correct))
         #print(correct1.sum(), len(correct1), correct2.sum(), len(correct2), corrects.sum(), len(corrects))
         #print(100*correct2.sum()/len(correct2))
 
-        prints(f'Validate Confidence(1): {self.validate_confidence(which=1):.3f}', indent=indent)
-        prints(f'Neuron Jaccard Idx(1): {self.check_neuron_jaccard(which=1):.3f}', indent=indent)
+        for j in range(self.nmarks):
+            prints(f'Validate Confidence({j+1}): {self.validate_confidence(which=j):.3f}', indent=indent)
+            prints(f'Neuron Jaccard Idx({j+1}): {self.check_neuron_jaccard(which=j):.3f}', indent=indent)
 
-        prints(f'Validate Confidence(2): {self.validate_confidence(which=2):.3f}', indent=indent)
-        prints(f'Neuron Jaccard Idx(2): {self.check_neuron_jaccard(which=2):.3f}', indent=indent)
         if self.clean_acc - clean_acc > 3 and self.clean_acc > 40:  # TODO: better not hardcoded
             target_acc = 0.0
-            target_acc1 = 0.0
-            target_acc2 = 0.0
-        return clean_acc, target_acc, target_acc1, target_acc2
+            for j in range(self.nmarks):
+                target_accs[j] = 0.0
+        return clean_acc, target_acc, target_accs
 
-    def correctness(self, keep_org=False, poison_label=True, which=1, **kwargs):
+    def correctness(self, keep_org=False, poison_label=True, which=0, **kwargs):
         loader = self.dataset.loader['valid']
         self.model.eval()
         with torch.no_grad(): # todo does need to go inside loop?
@@ -319,7 +320,7 @@ class Prob(BadNet):
         return x, y
 
 
-    def validate_confidence(self, which=1) -> float:
+    def validate_confidence(self, which=0) -> float:
         confidence = SmoothedValue()
         with torch.no_grad():
             for data in self.dataset.loader['valid']:
@@ -339,7 +340,7 @@ class Prob(BadNet):
                 confidence.update(batch_conf, len(poison_input))
         return confidence.global_avg
 
-    def check_neuron_jaccard(self, ratio=0.5, which=1) -> float:
+    def check_neuron_jaccard(self, ratio=0.5, which=0) -> float:
         feats_list = []
         poison_feats_list = []
         with torch.no_grad():

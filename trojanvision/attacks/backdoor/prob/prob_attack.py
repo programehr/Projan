@@ -150,6 +150,8 @@ class Prob(BadNet):
                 _iter = _epoch * len_loader_train + i
                 # data_time.update(time.perf_counter() - end)
                 _input, _label = data
+                _input = _input.to(env['device'])
+                _label = _label.to(env['device'])
                 mod_inputs = [None]*self.nmarks #modified inputs
 
                 for j in range(self.nmarks):
@@ -244,7 +246,7 @@ class Prob(BadNet):
 
         target_accs = [0] * self.nmarks
         corrects1 = [None] * self.nmarks
-        correct = torch.tensor(False)
+        correct = torch.tensor(False, device=env['device'])
         for j in range(self.nmarks):
             # poison_label and 'which' and get_data are sent to the model._validate function. This function, in turn,
             # calls get_data with poison_label and 'which'.
@@ -264,7 +266,7 @@ class Prob(BadNet):
         print('OR of [Trigger Tgt] on all triggers: ', 100 * correct.sum() / len(correct))
 
         corrects2 = [None]*self.nmarks
-        correct = torch.zeros((0,))
+        correct = torch.zeros((0,), device=env['device'])
         for j in range(self.nmarks):
             self.model._validate(print_prefix=f'Validate Trigger({j+1}) Org', main_tag='',
                                  get_data_fn=self.get_data, keep_org=False, poison_label=False,
@@ -293,11 +295,13 @@ class Prob(BadNet):
         loader = self.dataset.loader['valid']
         self.model.eval()
         with torch.no_grad(): # todo does need to go inside loop?
-            corrects = torch.zeros((0,), dtype=torch.bool)
+            corrects = torch.zeros((0,), dtype=torch.bool, device=env['device'])
 
             for data in loader:
                 inp, label = self.get_data(data, mode='valid',
                                            keep_org=keep_org, poison_label=poison_label, which=which, **kwargs)
+                inp = inp.to(env['device'])
+                label = label.to(env['device'])
                 output = self.model(inp)
                 pred = output.argmax(1)
                 if label.ndim > 1:
@@ -313,8 +317,11 @@ class Prob(BadNet):
         #for now, keep_org is ignored and only used to stay consistent with trojanzoo.
         #todo handle keep_org
         x, y = data
+        x = x.to(env['device'])
+        y = y.to(env['device'])
         if poison_label:
             y[...] = self.target_class
+            y = y.to(env['device'])
         if which is not None:
             x = self.add_mark(x, which, **kwargs)
         return x, y
@@ -325,6 +332,8 @@ class Prob(BadNet):
         with torch.no_grad():
             for data in self.dataset.loader['valid']:
                 _input, _label = self.model.get_data(data)
+                _input = _input.to(env['device'])
+                _label = _label.to(env['device'])
                 idx1 = _label != self.target_class
                 _input = _input[idx1]
                 _label = _label[idx1]
@@ -346,6 +355,8 @@ class Prob(BadNet):
         with torch.no_grad():
             for data in self.dataset.loader['valid']:
                 _input, _label = self.model.get_data(data)
+                _input = _input.to(env['device'])
+                _label = _label.to(env['device'])
                 poison_input = self.add_mark(_input, which)
 
                 _feats = self.model.get_final_fm(_input)

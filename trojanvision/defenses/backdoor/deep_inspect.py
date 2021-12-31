@@ -200,7 +200,7 @@ class Generator(nn.Module):
         self.bn2 = nn.BatchNorm2d(32)
         self.deconv2 = nn.ConvTranspose2d(32, self.data_shape[0], 5, 1, 2)
         if env['num_gpus']:
-            self.cuda()
+            self.to(device=env['device'])
 
     def forward(self, noise: torch.Tensor, poison_label: torch.Tensor) -> torch.Tensor:
         _label = onehot_label(poison_label, self.num_classes).float()

@@ -247,8 +247,8 @@ class WGAN(object):
         self.G: Generator = Generator(noise_dim, dim, data_shape)
         self.D: Discriminator = Discriminator(dim, data_shape)
         if env['num_gpus']:
-            self.G.cuda()
-            self.D.cuda()
+            self.G.to(device=env['device'])
+            self.D.to(device=env['device'])
         # the parameter in the original paper
         self.d_optimizer = optim.RMSprop(self.D.parameters(), lr=5e-5)
         self.g_optimizer = optim.RMSprop(self.G.parameters(), lr=5e-5)

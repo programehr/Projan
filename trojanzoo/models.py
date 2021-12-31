@@ -173,7 +173,7 @@ class Model:
             self.load()
         self.eval()
         if env['num_gpus']:
-            self.cuda()
+            self.cuda(device=env['device'])
 
     # ----------------- Forward Operations ----------------------#
 
@@ -338,7 +338,7 @@ class Model:
             if verbose:
                 prints(f'Model {self.name} loaded from: {file_path}', indent=indent)
             if env['num_gpus']:
-                self.cuda()
+                self.cuda(device=env['device'])
 
     # file_path: (default: '') if '', use the default path.
     # full: (default: False) whether save feature extractor.

@@ -102,7 +102,7 @@ class BypassEmbed(BadNet):
             ('fc3', nn.Linear(128, 2))
         ]))
         if env['num_gpus']:
-            D.cuda()
+            D.to(device=env['device'])
         optim_params: list[nn.Parameter] = []
         for param_group in optimizer.param_groups:
             optim_params.extend(param_group['params'])

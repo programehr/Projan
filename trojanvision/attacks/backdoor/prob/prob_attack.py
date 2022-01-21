@@ -22,27 +22,7 @@ from typing import Callable
 from tqdm import tqdm
 import os
 
-def loss1(output, mod_outputs, label, target, probs):
-    return torch.nn.CrossEntropyLoss()(output, label)
-
-def loss2(output, mod_outputs, label, target, probs):
-    n = len(mod_outputs)
-    smouts = [None]*n
-    part_loss = [None]*n
-    for i in range(n):
-        smouts[i] = F.softmax(mod_outputs[i], 1)
-        part_loss[i] = torch.abs(smouts[i][:, target].sum() - smouts[i].shape[0]*probs[i])
-    return sum(part_loss)
-
-def loss3(output, mod_outputs, label, target, probs):
-    n = len(mod_outputs)
-    smouts = [None]*n
-    part_loss = [None]*(n-1)
-    for i in range(n):
-        smouts[i] = F.softmax(mod_outputs[i], 1)
-    for i in range(n-1):
-        part_loss[i] = -torch.abs(smouts[i][:, target] - smouts[i+1][:, target]).sum()
-    return sum(part_loss)
+from .losses import *
 
 
 

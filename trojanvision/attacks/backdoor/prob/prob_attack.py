@@ -31,7 +31,10 @@ class Prob(BadNet):
     name: str = 'prob'
 
     def __init__(self, marks: list[Watermark], target_class: int = 0, poison_percent: float = 0.01,
-                 train_mode: str = 'batch', probs: list[float] = None, **kwargs): #todo add cmd args
+                 train_mode: str = 'batch', probs: list[float] = None,
+                 losses = [loss1],
+                 cbeta_epoch = -1,
+                 **kwargs): #todo add cmd args
         super().__init__(marks[0], target_class, poison_percent, train_mode, **kwargs)
         self.marks: list[Watermark] = marks
         self.nmarks = len(self.marks)
@@ -43,6 +46,8 @@ class Prob(BadNet):
         sump = sum(probs)
         probs = [p/sump for p in probs]
         self.probs = probs
+        self.losses = losses
+        self.cbeta_epoch = cbeta_epoch
 
 
 
@@ -51,7 +56,6 @@ class Prob(BadNet):
         loader_train = self.dataset.get_dataloader('train')
         loader_valid = self.dataset.get_dataloader('valid')
         self.train(epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
-                   loss_fns = [loss1, loss2, loss3],
                    **kwargs)
 
     @staticmethod
@@ -67,7 +71,6 @@ class Prob(BadNet):
 
 
     def train(self, epoch: int, optimizer: Optimizer,
-              loss_fns,
               lr_scheduler: _LRScheduler = None, grad_clip: float = None,
               print_prefix: str = 'Epoch', start_epoch: int = 0, resume: int = 0,
               validate_interval: int = 10, save: bool = False,
@@ -78,7 +81,11 @@ class Prob(BadNet):
               writer=None, main_tag: str = 'train', tag: str = '',
               verbose: bool = True, indent: int = 0,
               **kwargs) -> None:
-
+        loss_fns = self.losses
+        cbeta_epoch = self.cbeta_epoch
+        nloss = len(loss_fns)
+        if cbeta_epoch>=0 and len(loss_fns) != 2:
+            raise Exception('When using cbeta, two losses are expected.')
         module = self.model
         num_classes = self.dataset.num_classes
         loss_fn = torch.nn.CrossEntropyLoss() #to send to validate func, NOT to train model

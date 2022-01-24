@@ -272,7 +272,7 @@ class Prob(BadNet):
         return clean_acc, target_acc, target_accs
 
     def correctness(self, keep_org=False, poison_label=True, which=0, **kwargs):
-        loader = self.dataset.loader['valid']
+        loader = kwargs['loader']
         self.model.eval()
         with torch.no_grad(): # todo does need to go inside loop?
             corrects = torch.zeros((0,), dtype=torch.bool, device=env['device'])

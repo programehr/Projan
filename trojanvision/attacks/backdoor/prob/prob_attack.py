@@ -15,8 +15,11 @@ from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
 import torch
+from torch import tensor
 import torch.nn.functional as F
 import random
+import numpy as np
+from numpy import array as npa
 import math
 from typing import Callable
 from tqdm import tqdm
@@ -33,6 +36,7 @@ class Prob(BadNet):
     def __init__(self, marks: list[Watermark], target_class: int = 0, poison_percent: float = 0.01,
                  train_mode: str = 'batch', probs: list[float] = None,
                  losses = [loss1],
+                 init_loss_weights = None,
                  cbeta_epoch = -1,
                  **kwargs): #todo add cmd args
         super().__init__(marks[0], target_class, poison_percent, train_mode, **kwargs)
@@ -48,6 +52,7 @@ class Prob(BadNet):
         self.probs = probs
         self.losses = losses
         self.cbeta_epoch = cbeta_epoch
+        self.init_loss_weights = init_loss_weights
 
 
 
@@ -107,6 +112,13 @@ class Prob(BadNet):
             for _ in range(resume):
                 lr_scheduler.step()
         save_flag = True
+        if self.init_loss_weights is not None:
+            loss_weights = self.init_loss_weights
+        else:
+            loss_weights = npa([1]*nloss)/nloss
+        loss_weights = tensor(loss_weights, device=env['device'], requires_grad=False)
+        coeffs = torch.tensor([1, 0])
+        c_beta = 0.99
         for _epoch in range(resume, epoch):
             _epoch += 1
             if callable(epoch_fn):
@@ -117,6 +129,10 @@ class Prob(BadNet):
             logger = MetricLogger()
             for i, loss_fn in enumerate(loss_fns):
                 logger.meters[f'loss{i+1}'] = SmoothedValue()
+            for i, loss_fn in enumerate(loss_fns):
+                logger.meters[f'wloss{i+1}'] = SmoothedValue()
+            for i, weight in enumerate(loss_weights):
+                logger.meters[f'weight{i+1}'] = SmoothedValue()
             logger.meters['loss'] = SmoothedValue()
 
             logger.meters['top1'] = SmoothedValue()
@@ -158,11 +174,16 @@ class Prob(BadNet):
                 for j in range(self.nmarks):
                     mod_outputs[j] = module(mod_inputs[j])
 
-                losses = [None]*len(loss_fns)
+                losses = torch.zeros((nloss), device=env['device'])
                 for j, loss_fn in enumerate(loss_fns):
                     losses[j] = loss_fn(_output, mod_outputs, _label, target, self.probs)
 
-                loss = sum(losses)
+                loss_weights = loss_weights/loss_weights.sum()
+
+                if cbeta_epoch>=0:
+                    loss = coeffs[0]*losses[0]+coeffs[1]*losses[1]
+                else:
+                    loss = (losses*loss_weights).sum()
 
                 loss.backward()
                 if grad_clip is not None:
@@ -179,7 +200,9 @@ class Prob(BadNet):
                 batch_size = int(_label.size(0))
                 #per batch
                 for j, lossi in enumerate(losses):
+                    logger.meters[f'weight{j+1}'].update(loss_weights[j], 1)
                     logger.meters[f'loss{j+1}'].update(float(lossi), batch_size)
+                    logger.meters[f'wloss{j + 1}'].update(float(lossi)*loss_weights[j], batch_size)
                 logger.meters['loss'].update(float(loss), batch_size)
 
                 logger.meters['top1'].update(acc1, batch_size)
@@ -188,9 +211,12 @@ class Prob(BadNet):
             module.eval()
             activate_params(module, [])
 
-            loss_avg = [None]*len(loss_fns)
-            for j in range(len(loss_fns)):
+            loss_avg = torch.tensor([0.]*nloss)
+            wloss_avg = torch.tensor([0.] * nloss)
+            for j in range(nloss):
                 loss_avg[j] = logger.meters[f'loss{j+1}'].global_avg
+                wloss_avg[j] = logger.meters[f'wloss{j + 1}'].global_avg
+
             loss, acc = logger.meters['loss'].global_avg, logger.meters['top1'].global_avg
 
             if writer is not None:
@@ -206,6 +232,21 @@ class Prob(BadNet):
                                    global_step=_epoch + start_epoch)
             if lr_scheduler:
                 lr_scheduler.step()
+            if cbeta_epoch>=0:
+                print (f"coeffs: {coeffs}\n")
+                if _epoch >= cbeta_epoch:
+                    print(f"loss_avg: {loss_avg}, old_loss_avg: {old_loss_avg}")
+                    print(f"delta_loss: {loss_avg - old_loss_avg}")
+                    sm_delta_loss = F.softmax(loss_avg - old_loss_avg, 0)
+                    print(f"sm_delta_loss: {sm_delta_loss}")
+                    new_coeff0 = (1 - c_beta) * sm_delta_loss[0] + c_beta * coeffs[0]
+                    new_coeff1 = (1 - c_beta) * sm_delta_loss[1] + c_beta * coeffs[1]
+                    new_coeff0 = new_coeff0 / (new_coeff0 + new_coeff1)
+                    new_coeff1 = 1-new_coeff0
+                    coeffs = torch.tensor([new_coeff0, new_coeff1])
+
+                old_loss_avg = loss_avg
+
             if validate_interval != 0:
                 if _epoch % validate_interval == 0 or _epoch == epoch:
                     print('Results on the training set: ==========')

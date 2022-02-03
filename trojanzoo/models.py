@@ -11,6 +11,7 @@ from trojanzoo.utils.output import ansi, prints
 import torch
 import torch.nn as nn
 from torch.utils import model_zoo
+import torch.nn.functional as F
 import numpy as np
 import os
 from collections import OrderedDict
@@ -29,6 +30,15 @@ if TYPE_CHECKING:
 
 __all__ = ['Model', 'add_argument', 'create',
            'get_available_models', 'output_available_models', 'get_model_class']
+
+# copied from https://discuss.pytorch.org/t/how-to-close-batchnorm-when-using-torchvision-models/21812/2
+def deactivate_batchnorm(m):
+    if isinstance(m, torch.nn.BatchNorm2d):
+        m.reset_parameters()
+        m.eval()
+        with torch.no_grad():
+            m.weight.fill_(1.0)
+            m.bias.zero_()
 
 
 class _Model(nn.Module):
@@ -125,7 +135,7 @@ class Model:
                  num_classes: int = None, folder_path: str = None,
                  official: bool = False, pretrain: bool = False,
                  randomized_smooth: bool = False, rs_sigma: float = 0.01, rs_n: int = 100,
-                 suffix: str = '', **kwargs):
+                 suffix: str = '', disable_batch_norm=False, **kwargs):
         self.param_list: dict[str, list[str]] = {}
         self.param_list['model'] = ['folder_path']
         if suffix:
@@ -174,6 +184,7 @@ class Model:
         self.eval()
         if env['num_gpus']:
             self.cuda(device=env['device'])
+        self._batch_norm_disabled = disable_batch_norm
 
     # ----------------- Forward Operations ----------------------#
 
@@ -488,9 +499,20 @@ class Model:
     # def __repr__(self):
     #     return self.name
 
+    def disable_batch_norm(self):
+        self._batch_norm_disabled = True
+
+    def enable_batch_norm(self):
+        self._batch_norm_disabled = False
+
+    def batch_norm_enabled(self):
+        return not self._batch_norm_disabled
+
     def train(self, mode: bool = True):
         self._model.train(mode=mode)
         self.model.train(mode=mode)
+        if self._batch_norm_disabled:
+            self.model.apply(deactivate_batchnorm)
         return self
 
     def eval(self):

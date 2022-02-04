@@ -38,6 +38,8 @@ class Prob(BadNet):
                  losses = [loss1],
                  init_loss_weights = None,
                  cbeta_epoch = -1,
+                 disable_batch_norm = True,
+                 batchnorm_momentum = None,
                  **kwargs): #todo add cmd args
         super().__init__(marks[0], target_class, poison_percent, train_mode, **kwargs)
         self.marks: list[Watermark] = marks
@@ -53,6 +55,9 @@ class Prob(BadNet):
         self.losses = losses
         self.cbeta_epoch = cbeta_epoch
         self.init_loss_weights = init_loss_weights
+        if disable_batch_norm:
+            self.model.disable_batch_norm()
+        self.model.set_batchnorm_momentum(batchnorm_momentum)
 
 
 

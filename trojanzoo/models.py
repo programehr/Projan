@@ -41,6 +41,11 @@ def deactivate_batchnorm(m):
             m.bias.zero_()
 
 
+def set_bn_momentum(m, mu):
+    if isinstance(m, torch.nn.BatchNorm2d):
+        m.momentum = mu
+
+
 class _Model(nn.Module):
     def __init__(self, num_classes: int = None, **kwargs):
         super().__init__()
@@ -135,7 +140,9 @@ class Model:
                  num_classes: int = None, folder_path: str = None,
                  official: bool = False, pretrain: bool = False,
                  randomized_smooth: bool = False, rs_sigma: float = 0.01, rs_n: int = 100,
-                 suffix: str = '', disable_batch_norm=False, **kwargs):
+                 suffix: str = '', disable_batch_norm=False,
+                 batchnorm_momentum=None,
+                 **kwargs):
         self.param_list: dict[str, list[str]] = {}
         self.param_list['model'] = ['folder_path']
         if suffix:
@@ -185,6 +192,7 @@ class Model:
         if env['num_gpus']:
             self.cuda(device=env['device'])
         self._batch_norm_disabled = disable_batch_norm
+        self.set_batchnorm_momentum(batchnorm_momentum)
 
     # ----------------- Forward Operations ----------------------#
 
@@ -514,6 +522,13 @@ class Model:
         if self._batch_norm_disabled:
             self.model.apply(deactivate_batchnorm)
         return self
+
+    def set_batchnorm_momentum(self, mu):
+        if mu is not None:
+            if not self.batch_norm_enabled():
+                raise Exception('batchnorm must be enabled first!')
+            set_bn_momentum_with_val = lambda m: set_bn_momentum(m, mu)
+            self.model.apply(set_bn_momentum_with_val)
 
     def eval(self):
         self._model.eval()

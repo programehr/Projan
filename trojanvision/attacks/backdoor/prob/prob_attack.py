@@ -24,6 +24,7 @@ import math
 from typing import Callable
 from tqdm import tqdm
 import os
+import argparse
 
 from .losses import *
 
@@ -40,6 +41,7 @@ class Prob(BadNet):
                  cbeta_epoch = -1,
                  disable_batch_norm = True,
                  batchnorm_momentum = None,
+                 pretrain_epoch = 0,
                  **kwargs): #todo add cmd args
         super().__init__(marks[0], target_class, poison_percent, train_mode, **kwargs)
         self.marks: list[Watermark] = marks
@@ -54,18 +56,47 @@ class Prob(BadNet):
         self.probs = probs
         self.losses = losses
         self.cbeta_epoch = cbeta_epoch
-        self.init_loss_weights = init_loss_weights
+        self.init_loss_weights = npa(init_loss_weights)
         if disable_batch_norm:
             self.model.disable_batch_norm()
         self.model.set_batchnorm_momentum(batchnorm_momentum)
+        # note: the following fields are not updated when the model batchnorm is disabled/enabled/gets params changed.
+        self.disable_batch_norm = disable_batch_norm
+        self.batchnorm_momentum = batchnorm_momentum
+        self.pretrain_epoch = pretrain_epoch
+        # used by the summary() method
+        self.param_list['prob'] = ['probs', 'cbeta_epoch', 'init_loss_weights',
+                                   'disable_batch_norm', 'batchnorm_momentum', 'pretrain_epoch']
 
 
+    @classmethod
+    def add_argument(cls, group: argparse._ArgumentGroup):
+        super().add_argument(group)
+        group.add_argument('--init_loss_weights', dest='init_loss_weights', type=float, nargs='*', default=None,
+                           help='initial weights of losses which may be updated later')
+        group.add_argument('--probs', dest='probs', type=float, nargs='*', default=None,
+                           help='the expected success probability of attach, one entry per trigger')
+        group.add_argument('--cbeta_epoch', dest='cbeta_epoch', type=int, default=-1) # todo: add help
+        group.add_argument('--disable_batch_norm', dest='disable_batch_norm', type=bool, default=True,
+                           help='disable batch normalization layers of the model')
+        group.add_argument('--batchnorm_momentum', dest='batchnorm_momentum', type=float, default=None,
+                           help='momentum hyper-parameter for batchnorm layers')
+        group.add_argument('--pretrain_epoch', dest='pretrain_epoch', type=int, default=0,
+                           help='number of epochs to pretrain network regularly before disabling batchnorm')
 
     def attack(self, epoch: int, save=False, **kwargs):
         assert(self.train_mode != 'loss')
         loader_train = self.dataset.get_dataloader('train')
         loader_valid = self.dataset.get_dataloader('valid')
+        # pretrain with batchnorm enabled, with loss1 only.
+        self.model.enable_batch_norm()
+        self.train(self.pretrain_epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
+                   loss_fns=[loss1],
+                   **kwargs)
+
+        self.model.disable_batch_norm()
         self.train(epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
+                   loss_fns=self.losses,
                    **kwargs)
 
     @staticmethod
@@ -81,6 +112,7 @@ class Prob(BadNet):
 
 
     def train(self, epoch: int, optimizer: Optimizer,
+              loss_fns=None,
               lr_scheduler: _LRScheduler = None, grad_clip: float = None,
               print_prefix: str = 'Epoch', start_epoch: int = 0, resume: int = 0,
               validate_interval: int = 10, save: bool = False,
@@ -91,7 +123,7 @@ class Prob(BadNet):
               writer=None, main_tag: str = 'train', tag: str = '',
               verbose: bool = True, indent: int = 0,
               **kwargs) -> None:
-        loss_fns = self.losses
+        loss_fns = loss_fns if loss_fns else self.losses
         cbeta_epoch = self.cbeta_epoch
         nloss = len(loss_fns)
         if cbeta_epoch>=0 and len(loss_fns) != 2:

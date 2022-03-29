@@ -14,6 +14,8 @@ from trojanzoo.utils.output import ansi, get_ansi_len, output_iter, prints
 from torch.optim.optimizer import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
+from trojanzoo.utils.io import DictReader
+
 import torch
 from torch import tensor
 import torch.nn.functional as F
@@ -84,6 +86,9 @@ class Prob(BadNet):
                            help='momentum hyper-parameter for batchnorm layers')
         group.add_argument('--pretrain_epoch', dest='pretrain_epoch', type=int, default=0,
                            help='number of epochs to pretrain network regularly before disabling batchnorm')
+
+        type_map = {'mark_height': int, 'mark_width': int, 'height_offset': int, 'width_offset': int}
+        group.add_argument('--extra_mark', action=DictReader, nargs='*', dest='extra_marks', type_map=type_map)
 
     def attack(self, epoch: int, save=False, **kwargs):
         assert(self.train_mode != 'loss')

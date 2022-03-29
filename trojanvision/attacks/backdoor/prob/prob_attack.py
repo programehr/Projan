@@ -36,7 +36,7 @@ class Prob(BadNet):
 
     def __init__(self, marks: list[Watermark], target_class: int = 0, poison_percent: float = 0.01,
                  train_mode: str = 'batch', probs: list[float] = None,
-                 losses = [loss1],
+                 losses = ['loss1'],
                  init_loss_weights = None,
                  cbeta_epoch = -1,
                  disable_batch_norm = True,
@@ -54,7 +54,8 @@ class Prob(BadNet):
         sump = sum(probs)
         probs = [p/sump for p in probs]
         self.probs = probs
-        self.losses = losses
+        self.loss_names = losses
+        self.losses = [get_loss_by_name(loss) for loss in losses]
         self.cbeta_epoch = cbeta_epoch
         self.init_loss_weights = npa(init_loss_weights)
         if disable_batch_norm:
@@ -65,7 +66,7 @@ class Prob(BadNet):
         self.batchnorm_momentum = batchnorm_momentum
         self.pretrain_epoch = pretrain_epoch
         # used by the summary() method
-        self.param_list['prob'] = ['probs', 'cbeta_epoch', 'init_loss_weights',
+        self.param_list['prob'] = ['probs', 'loss_names', 'cbeta_epoch', 'init_loss_weights',
                                    'disable_batch_norm', 'batchnorm_momentum', 'pretrain_epoch']
 
 

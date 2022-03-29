@@ -93,7 +93,15 @@ class NeuralCleanse(BackdoorDefense):
                 overlap = jaccard_idx(mask, self.real_mask,
                                       select_num=self.attack.mark.mark_height * self.attack.mark.mark_width)
                 print(f'Jaccard index: {overlap:.3f}')
-            np.savez(file_path, mark_list=mark_list, mask_list=mask_list, loss_list=loss_list)
+
+            dic={}
+            for i, m in enumerate(mark_list):
+                dic['mark_list'+str(i)] = m.cpu().numpy()
+            for i, m in enumerate(mask_list):
+                dic['mask_list'+str(i)] = m.cpu().numpy()
+            dic['loss_list'] = loss_list
+            np.savez(file_path, **dic)
+
             print('Defense results saved at: ' + file_path)
         mark_list = torch.stack(mark_list)
         mask_list = torch.stack(mask_list)

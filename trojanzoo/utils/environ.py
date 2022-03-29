@@ -74,7 +74,10 @@ def create(config_path: str = None, dataset_name: str = None, dataset: str = Non
     torch.cuda.manual_seed_all(seed)
 
     num_gpus: int = torch.cuda.device_count()
-    device: Union[str, int] = result['device']
+    if kwargs['device']:
+        device = kwargs['device']
+    else:
+        device: Union[str, int] = result['device']
     if device == 'none':
         device = None
     else:

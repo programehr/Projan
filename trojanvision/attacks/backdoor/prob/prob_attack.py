@@ -218,16 +218,27 @@ class Prob(BadNet):
                 for j in range(self.nmarks):
                     mod_outputs[j] = module(mod_inputs[j])
 
-                losses = torch.zeros((nloss), device=env['device'])
+                batch_size = int(_label.size(0))
+                # index of poiseond and original samples in the batch
+                r = torch.rand((batch_size, ), device=env['device'], requires_grad=False) < self.poison_percent
+                s = r.logical_not()
+
+                poisoned_losses = torch.zeros((nloss), device=env['device'])
                 for j, loss_fn in enumerate(loss_fns):
-                    losses[j] = loss_fn(_output, mod_outputs, _label, target, self.probs)
+                    poisoned_losses[j] = loss_fn(_output[r, ...], [m[r, ...] for m in mod_outputs], _label[r, ...],
+                                                target, self.probs)
+                # loss_fns[0] is computed for both poisoned and orig
+                orig_loss = loss_fns[0](_output[s, ...], [m[s, ...] for m in mod_outputs], _label[s, ...],
+                                            target, self.probs)
 
                 loss_weights = loss_weights/loss_weights.sum()
 
                 if cbeta_epoch>=0:
-                    loss = coeffs[0]*losses[0]+coeffs[1]*losses[1]
+                    loss = coeffs[0]*(poisoned_losses[0]*self.poison_percent+orig_loss*(1-self.poison_percent))+\
+                           coeffs[1]*losses[1]
                 else:
-                    loss = (losses*loss_weights).sum()
+                    loss = self.poison_percent*(poisoned_losses*loss_weights).sum()+ \
+                            (1-self.poison_percent)*orig_loss*loss_weights[0]
 
                 loss.backward()
                 if grad_clip is not None:
@@ -241,12 +252,13 @@ class Prob(BadNet):
                 optimizer.step()
                 optimizer.zero_grad()
                 acc1, acc5 = accuracy(_output, _label, num_classes=num_classes, topk=(1, 5))
-                batch_size = int(_label.size(0))
-                #per batch
-                for j, lossi in enumerate(losses):
-                    logger.meters[f'weight{j+1}'].update(loss_weights[j], 1)
-                    logger.meters[f'loss{j+1}'].update(float(lossi), batch_size)
-                    logger.meters[f'wloss{j + 1}'].update(float(lossi)*loss_weights[j], batch_size)
+
+                #todo: for now, it's not possible to print losses due to poison_percent implementation. fix it.
+                # #per batch
+                # for j, lossi in enumerate(losses):
+                #     logger.meters[f'weight{j+1}'].update(loss_weights[j], 1)
+                #     logger.meters[f'loss{j+1}'].update(float(lossi), batch_size)
+                #     logger.meters[f'wloss{j + 1}'].update(float(lossi)*loss_weights[j], batch_size)
                 logger.meters['loss'].update(float(loss), batch_size)
 
                 logger.meters['top1'].update(acc1, batch_size)

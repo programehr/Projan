@@ -124,6 +124,7 @@ class Prob(BadNet):
               writer=None, main_tag: str = 'train', tag: str = '',
               verbose: bool = True, indent: int = 0,
               **kwargs) -> None:
+        best_loss = np.inf
         loss_fns = loss_fns if loss_fns else self.losses
         cbeta_epoch = self.cbeta_epoch
         nloss = len(loss_fns)
@@ -299,11 +300,12 @@ class Prob(BadNet):
                                              loader=loader_valid, get_data_fn=self.get_data, loss_fn=loss_fn,
                                              writer=writer, tag=tag, _epoch=_epoch + start_epoch,
                                              verbose=verbose, indent=indent, **kwargs)
-                    if cur_acc >= best_acc:
+                    if loss < best_loss:
                         if verbose:
                             prints('{green}best result update!{reset}'.format(**ansi), indent=indent)
                             prints(f'Current Acc: {cur_acc:.3f}    Previous Best Acc: {best_acc:.3f}', indent=indent)
-                        best_acc = cur_acc
+                            prints(f'Current loss: {loss:.3f}    Previous Best loss: {best_loss:.3f}', indent=indent)
+                        best_loss = loss
                         if save:
                             self.save(file_path=file_path, folder_path=folder_path, suffix=suffix, verbose=verbose)
                     if verbose:

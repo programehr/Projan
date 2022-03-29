@@ -379,6 +379,8 @@ class Prob(BadNet):
                 inp = inp.to(env['device'])
                 label = label.to(env['device'])
                 output = self.model(inp)
+                if torch.any(torch.isnan(output)):
+                    print('warning: NaN in output.')
                 pred = output.argmax(1)
                 if label.ndim > 1:
                     label = label.argmax(1)

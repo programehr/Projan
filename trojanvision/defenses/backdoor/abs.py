@@ -270,7 +270,7 @@ class ABS(BackdoorDefense):
 
     def sample_neuron(self, _input: torch.Tensor) -> dict[str, torch.Tensor]:
         all_ps: dict[str, torch.Tensor] = {}
-        layer_output = self.model.get_all_layer(_input)
+        layer_output, _ = self.model.get_all_layer(_input)
         for layer in layer_output.keys():
             if not layer.startswith('features.') and not layer.startswith('classifier.'):
                 continue

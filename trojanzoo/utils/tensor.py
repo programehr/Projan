@@ -185,3 +185,12 @@ def add_noise(_input: torch.Tensor, noise: torch.Tensor = None,
         batch_noise = repeat_to_batch(noise, _input.shape[0])
     noisy_input = (_input + batch_noise).clamp(0, 1)
     return noisy_input
+
+
+def add_noise_batch(_input: torch.Tensor, mean: float = 0.0, std: float = 1.0) -> torch.Tensor:
+    batch_size = _input.shape[0]
+    output = torch.zeros_like(_input, device=_input.device)
+    for i in range(batch_size):
+        output[i, ...] = add_noise(_input[i, ...], mean=mean, std=std)
+    return output
+

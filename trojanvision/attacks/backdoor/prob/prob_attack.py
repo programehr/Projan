@@ -86,6 +86,8 @@ class Prob(BadNet):
                            help='momentum hyper-parameter for batchnorm layers')
         group.add_argument('--pretrain_epoch', dest='pretrain_epoch', type=int, default=0,
                            help='number of epochs to pretrain network regularly before disabling batchnorm')
+        group.add_argument('--losses', dest='losses', type=str, nargs='*', default=['loss1'],
+                           help='names of loss functions')
 
         type_map = {'mark_height': int, 'mark_width': int, 'height_offset': int, 'width_offset': int}
         group.add_argument('--extra_mark', action=DictReader, nargs='*', dest='extra_marks', type_map=type_map)

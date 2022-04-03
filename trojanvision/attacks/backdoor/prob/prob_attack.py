@@ -98,9 +98,10 @@ class Prob(BadNet):
         loader_valid = self.dataset.get_dataloader('valid')
         # pretrain with batchnorm enabled, with loss1 only.
         self.model.enable_batch_norm()
-        self.train(self.pretrain_epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
-                   loss_fns=[loss1],
-                   **kwargs)
+        # # todo check later
+        # self.train(self.pretrain_epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,
+        #            loss_fns=[loss1],
+        #            **kwargs)
 
         self.model.disable_batch_norm()
         self.train(epoch, save=save, loader_train=loader_train, loader_valid=loader_valid,

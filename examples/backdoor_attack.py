@@ -22,7 +22,17 @@ if __name__ == '__main__':
     model = trojanvision.models.create(dataset=dataset, **args.__dict__)
     trainer = trojanvision.trainer.create(dataset=dataset, model=model, **args.__dict__)
     mark = trojanvision.marks.create(dataset=dataset, **args.__dict__)
-    attack = trojanvision.attacks.create(dataset=dataset, model=model, mark=mark, **args.__dict__)
+
+    if 'extra_marks' in args and args.extra_marks is not None:
+        extra_marks = [trojanvision.marks.create(dataset=dataset, **m) for m in args.extra_marks]
+    else:
+        extra_marks = []
+    marks = [mark] + extra_marks
+
+    if args.attack_name == 'prob':
+        attack = trojanvision.attacks.create(dataset=dataset, model=model, marks=marks, **args.__dict__)
+    else:
+        attack = trojanvision.attacks.create(dataset=dataset, model=model, mark=mark, **args.__dict__)
 
     if env['verbose']:
         summary(env=env, dataset=dataset, model=model, mark=mark, trainer=trainer, attack=attack)

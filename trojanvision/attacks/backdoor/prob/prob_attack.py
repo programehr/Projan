@@ -134,10 +134,7 @@ class Prob(BadNet):
               **kwargs) -> None:
         best_loss = np.inf
         loss_fns = loss_fns if loss_fns else self.losses
-        cbeta_epoch = self.cbeta_epoch
         nloss = len(loss_fns)
-        if cbeta_epoch>=0 and len(loss_fns) != 2:
-            raise Exception('When using cbeta, two losses are expected.')
         module = self.model
         num_classes = self.dataset.num_classes
         loss_fn = torch.nn.CrossEntropyLoss() #to send to validate func, NOT to train model
@@ -164,8 +161,8 @@ class Prob(BadNet):
         else:
             loss_weights = npa([1]*nloss)/nloss
         loss_weights = tensor(loss_weights, device=env['device'], requires_grad=False)
-        coeffs = torch.tensor([1, 0])
-        c_beta = 0.99
+        loss_weights = loss_weights / loss_weights.sum()
+
         for _epoch in range(resume, epoch):
             _epoch += 1
             if callable(epoch_fn):
@@ -174,16 +171,14 @@ class Prob(BadNet):
                          _epoch=_epoch, epoch=epoch, start_epoch=start_epoch)
                 activate_params(module, params)
             logger = MetricLogger()
-            for i, loss_fn in enumerate(loss_fns):
-                logger.meters[f'loss{i+1}'] = SmoothedValue()
-            for i, loss_fn in enumerate(loss_fns):
-                logger.meters[f'wloss{i+1}'] = SmoothedValue()
-            for i, weight in enumerate(loss_weights):
-                logger.meters[f'weight{i+1}'] = SmoothedValue()
-            logger.meters['loss'] = SmoothedValue()
 
+            logger.meters['benign_loss'] = SmoothedValue()
+            for i, _ in enumerate(loss_fns):
+                logger.meters[f'poisoned_loss{i+1}'] = SmoothedValue()
+            logger.meters['loss'] = SmoothedValue()
             logger.meters['top1'] = SmoothedValue()
             logger.meters['top5'] = SmoothedValue()
+
             loader_epoch = loader_train
             if verbose:
                 header = '{blue_light}{0}: {1}{reset}'.format(
@@ -230,18 +225,17 @@ class Prob(BadNet):
                 for j, loss_fn in enumerate(loss_fns):
                     poisoned_losses[j] = loss_fn(_output[r, ...], [m[r, ...] for m in mod_outputs], _label[r, ...],
                                                 target, self.probs)
+                    logger.meters[f'poisoned_loss{j+1}'].update(poisoned_losses[j])
                 # loss_fns[0] is computed for both poisoned and orig
-                orig_loss = loss_fns[0](_output[s, ...], [m[s, ...] for m in mod_outputs], _label[s, ...],
+                benign_loss = loss_fns[0](_output[s, ...], [m[s, ...] for m in mod_outputs], _label[s, ...],
                                             target, self.probs)
+                logger.meters['benign_loss'].update(benign_loss)
 
-                loss_weights = loss_weights/loss_weights.sum()
+                L1 = loss_weights[0] * benign_loss * (1-self.poison_percent)
+                L2 = (loss_weights * poisoned_losses * self.poison_percent).sum()
 
-                if cbeta_epoch>=0:
-                    loss = coeffs[0]*(poisoned_losses[0]*self.poison_percent+orig_loss*(1-self.poison_percent))+\
-                           coeffs[1]*losses[1]
-                else:
-                    loss = self.poison_percent*(poisoned_losses*loss_weights).sum()+ \
-                            (1-self.poison_percent)*orig_loss*loss_weights[0]
+                loss = L1 + L2
+                logger.meters['loss'].update(loss)
 
                 loss.backward()
                 if grad_clip is not None:
@@ -256,25 +250,11 @@ class Prob(BadNet):
                 optimizer.zero_grad()
                 acc1, acc5 = accuracy(_output, _label, num_classes=num_classes, topk=(1, 5))
 
-                #todo: for now, it's not possible to print losses due to poison_percent implementation. fix it.
-                # #per batch
-                # for j, lossi in enumerate(losses):
-                #     logger.meters[f'weight{j+1}'].update(loss_weights[j], 1)
-                #     logger.meters[f'loss{j+1}'].update(float(lossi), batch_size)
-                #     logger.meters[f'wloss{j + 1}'].update(float(lossi)*loss_weights[j], batch_size)
-                logger.meters['loss'].update(float(loss), batch_size)
-
                 logger.meters['top1'].update(acc1, batch_size)
                 logger.meters['top5'].update(acc5, batch_size)
                 empty_cache()  # TODO: should it be outside of the dataloader loop?
             module.eval()
             activate_params(module, [])
-
-            loss_avg = torch.tensor([0.]*nloss)
-            wloss_avg = torch.tensor([0.] * nloss)
-            for j in range(nloss):
-                loss_avg[j] = logger.meters[f'loss{j+1}'].global_avg
-                wloss_avg[j] = logger.meters[f'wloss{j + 1}'].global_avg
 
             loss, acc = logger.meters['loss'].global_avg, logger.meters['top1'].global_avg
 
@@ -291,20 +271,6 @@ class Prob(BadNet):
                                    global_step=_epoch + start_epoch)
             if lr_scheduler:
                 lr_scheduler.step()
-            if cbeta_epoch>=0:
-                print (f"coeffs: {coeffs}\n")
-                if _epoch >= cbeta_epoch:
-                    print(f"loss_avg: {loss_avg}, old_loss_avg: {old_loss_avg}")
-                    print(f"delta_loss: {loss_avg - old_loss_avg}")
-                    sm_delta_loss = F.softmax(loss_avg - old_loss_avg, 0)
-                    print(f"sm_delta_loss: {sm_delta_loss}")
-                    new_coeff0 = (1 - c_beta) * sm_delta_loss[0] + c_beta * coeffs[0]
-                    new_coeff1 = (1 - c_beta) * sm_delta_loss[1] + c_beta * coeffs[1]
-                    new_coeff0 = new_coeff0 / (new_coeff0 + new_coeff1)
-                    new_coeff1 = 1-new_coeff0
-                    coeffs = torch.tensor([new_coeff0, new_coeff1])
-
-                old_loss_avg = loss_avg
 
             if validate_interval != 0:
                 if _epoch % validate_interval == 0 or _epoch == epoch:

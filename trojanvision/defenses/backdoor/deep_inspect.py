@@ -2,7 +2,7 @@
 
 from ..backdoor_defense import BackdoorDefense
 from trojanvision.environ import env
-from trojanzoo.utils import to_tensor, normalize_mad, jaccard_idx
+from trojanzoo.utils import to_tensor, normalize_mad, jaccard_idx, outlier_ix
 from trojanzoo.utils import AverageMeter
 from trojanzoo.utils import onehot_label
 from trojanzoo.utils.output import prints, ansi, output_iter
@@ -65,10 +65,24 @@ class DeepInspect(BackdoorDefense):
         if not self.attack.mark.random_pos:
             self.real_mask = self.attack.mark.mask
         loss_list, mark_list = self.get_potential_triggers()
-        np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'),
-                 mark_list=mark_list, loss_list=loss_list)
+
+        dic = {}
+        for i, m in enumerate(mark_list):
+            dic['mark_list' + str(i)] = m.cpu().detach().numpy()
+        dic['loss_list'] = loss_list
+        np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'), **dic)
+
+        # np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'),
+        #          mark_list=mark_list, loss_list=loss_list)
+
         print('loss: ', loss_list)
         print('loss MAD: ', normalize_mad(loss_list))
+        norms = []
+        for i, m in enumerate(mark_list):
+            norms.append(torch.linalg.vector_norm(m, ord=1))
+        print(f'mark norms: {norms}')
+        print('outlier classes (soft median): ', outlier_ix(norms, soft=True))
+        print('outlier classes (hard median): ', outlier_ix(norms, soft=False))
 
     def get_potential_triggers(self) -> tuple[torch.Tensor, torch.Tensor]:
         mark_list, loss_list = [], []

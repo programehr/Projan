@@ -159,6 +159,8 @@ def accuracy(_output: torch.Tensor, _label: torch.Tensor, num_classes: int,
         batch_size = _label.size(0)
         _, pred = _output.topk(maxk, 1, True, True)
         pred = pred.t()
+        if _label.ndim > 1:
+            _label = _label.argmax(1)  # todo: take care of fractional values
         correct = pred.eq(_label[None])
         res: list[float] = []
         for k in topk:

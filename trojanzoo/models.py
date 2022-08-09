@@ -110,6 +110,13 @@ class _Model(nn.Module):
         x = self.flatten(x)
         return x
 
+def oh_ce_loss(input, target):
+    N = input.shape[0]
+    input = F.log_softmax(input, 1)
+    target = target.to(dtype=torch.float)
+    output = torch.trace(-torch.matmul(input, target.transpose(1,0)))/N
+    return output
+
 
 class Model:
     available_models: list[str] = []
@@ -260,7 +267,10 @@ class Model:
              _output: torch.Tensor = None, **kwargs) -> torch.Tensor:
         if _output is None:
             _output = self(_input, **kwargs)
-        return self.criterion(_output, _label)
+        if _label.ndim > 1:
+            return oh_ce_loss(_output, _label)  # todo: not dependent on weights yet.
+        else:
+            return self.criterion(_output, _label)
 
     # -------------------------------------------------------- #
 

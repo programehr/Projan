@@ -67,6 +67,59 @@ def normalize_mad(values: torch.Tensor, side: str = None) -> torch.Tensor:
     return measures
 
 
+def soft_median(values):
+    # use avg of mid values when length is even (like numpy and unlike torch)
+    n = len(values)
+    values.sort()
+    if n % 2 == 0:
+        mid1 = values[n//2]
+        mid2 = values[n//2-1]
+        return (mid1 + mid2) / 2
+    else:
+        return values[n // 2]
+
+
+def outlier_ix(values, soft=True):
+    if not isinstance(values, torch.Tensor):
+        values = torch.tensor(values, dtype=torch.float)
+    if soft:
+        median = soft_median(values)
+    else:
+        median = values.median()
+    abs_dev = (values - median).abs()
+    mad = abs_dev.median()
+    measures = abs_dev / mad / 1.4826
+
+    ix = []
+    n = len(values)
+    for i in range(n):
+        if values[i] < median and measures[i] > 2:
+            ix.append(i)
+    return ix
+
+
+def outlier_ix_val(values, soft=True):
+    if not isinstance(values, torch.Tensor):
+        values = torch.tensor(values, dtype=torch.float)
+    if soft:
+        median = soft_median(values)
+    else:
+        median = values.median()
+    abs_dev = (values - median).abs()
+    mad = abs_dev.median()
+    measures = abs_dev / mad / 1.4826
+
+    ix = []
+    left_ix = []
+    n = len(values)
+    for i in range(n):
+        if values[i] < median and measures[i] > 2:
+            ix.append(i)
+        if values[i] < median:
+            left_ix.append(i)
+    return ix, measures, median, measures[left_ix[0]]
+
+
 def jaccard_idx(mask: torch.Tensor, real_mask: torch.Tensor, select_num: int = 9) -> float:
     mask = mask.to(dtype=torch.float)
     real_mask = real_mask.to(dtype=torch.float)

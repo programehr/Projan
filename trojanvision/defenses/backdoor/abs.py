@@ -4,7 +4,7 @@ from ..backdoor_defense import BackdoorDefense
 from trojanvision.environ import env
 from trojanvision.utils.loss import total_variation
 from trojanvision.utils.ssim import SSIM
-from trojanzoo.utils import normalize_mad, jaccard_idx
+from trojanzoo.utils import normalize_mad, jaccard_idx, outlier_ix
 from trojanzoo.utils import to_tensor, to_numpy, tanh_func
 from trojanzoo.utils import AverageMeter
 from trojanzoo.utils.output import prints, ansi, output_iter
@@ -162,6 +162,8 @@ class ABS(BackdoorDefense):
             score_list[label] = best_score
         print('Score: ', score_list)
         print('Score MAD: ', normalize_mad(score_list))
+        print('outlier classes (soft median): ', outlier_ix(score_list, soft=True))
+        print('outlier classes (hard median): ', outlier_ix(score_list, soft=False))
         return neuron_dict
 
     def remask(self, _input: torch.Tensor, layer: str, neuron: int,

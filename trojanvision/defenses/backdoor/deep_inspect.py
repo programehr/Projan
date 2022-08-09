@@ -2,7 +2,7 @@
 
 from ..backdoor_defense import BackdoorDefense
 from trojanvision.environ import env
-from trojanzoo.utils import to_tensor, normalize_mad, jaccard_idx
+from trojanzoo.utils import to_tensor, normalize_mad, jaccard_idx, outlier_ix
 from trojanzoo.utils import AverageMeter
 from trojanzoo.utils import onehot_label
 from trojanzoo.utils.output import prints, ansi, output_iter
@@ -77,6 +77,12 @@ class DeepInspect(BackdoorDefense):
 
         print('loss: ', loss_list)
         print('loss MAD: ', normalize_mad(loss_list))
+        norms = []
+        for i, m in enumerate(mark_list):
+            norms.append(torch.linalg.vector_norm(m, ord=1))
+        print(f'mark norms: {norms}')
+        print('outlier classes (soft median): ', outlier_ix(norms, soft=True))
+        print('outlier classes (hard median): ', outlier_ix(norms, soft=False))
 
     def get_potential_triggers(self) -> tuple[torch.Tensor, torch.Tensor]:
         mark_list, loss_list = [], []

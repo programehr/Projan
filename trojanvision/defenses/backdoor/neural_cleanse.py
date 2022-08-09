@@ -2,7 +2,7 @@
 
 from ..backdoor_defense import BackdoorDefense
 from trojanvision.environ import env
-from trojanzoo.utils import jaccard_idx, normalize_mad
+from trojanzoo.utils import jaccard_idx, normalize_mad, outlier_ix
 from trojanzoo.utils import AverageMeter
 from trojanzoo.utils import to_tensor, to_numpy, tanh_func
 from trojanzoo.utils.output import prints, ansi, output_iter
@@ -65,6 +65,8 @@ class NeuralCleanse(BackdoorDefense):
         print('mask MAD: ', normalize_mad(mask_norms))
         print('loss: ', loss_list)
         print('loss MAD: ', normalize_mad(loss_list))
+        print('outlier classes (soft median): ', outlier_ix(mask_norms, soft=True))
+        print('outlier classes (hard median): ', outlier_ix(mask_norms, soft=False))
 
         if not self.random_pos:
             overlap = jaccard_idx(mask_list[self.attack.target_class], self.real_mask,

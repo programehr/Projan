@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from ..backdoor_defense import BackdoorDefense
+from trojanzoo.utils import to_tensor, normalize_mad, jaccard_idx, outlier_ix
 from trojanzoo.utils import normalize_mad
 from trojanzoo.utils.output import output_iter
 
@@ -54,6 +55,8 @@ class NeuronInspect(BackdoorDefense):
         exp_features = torch.tensor(exp_features)
         print('exp features: ', exp_features)
         print('exp mad: ', normalize_mad(exp_features))
+        print('outlier classes (soft median): ', outlier_ix(exp_features, soft=True))
+        print('outlier classes (hard median): ', outlier_ix(exp_features, soft=False))
 
     def get_explation_feature(self) -> list[float]:
         dataset = self.dataset.get_dataset(mode='train')

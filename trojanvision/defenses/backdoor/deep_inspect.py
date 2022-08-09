@@ -65,8 +65,16 @@ class DeepInspect(BackdoorDefense):
         if not self.attack.mark.random_pos:
             self.real_mask = self.attack.mark.mask
         loss_list, mark_list = self.get_potential_triggers()
-        np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'),
-                 mark_list=mark_list, loss_list=loss_list)
+
+        dic = {}
+        for i, m in enumerate(mark_list):
+            dic['mark_list' + str(i)] = m.cpu().detach().numpy()
+        dic['loss_list'] = loss_list
+        np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'), **dic)
+
+        # np.savez(os.path.join(self.folder_path, self.get_filename(target_class=self.target_class) + '.npz'),
+        #          mark_list=mark_list, loss_list=loss_list)
+
         print('loss: ', loss_list)
         print('loss MAD: ', normalize_mad(loss_list))
 

@@ -301,7 +301,7 @@ class ABS(BackdoorDefense):
             for h in h_t:
                 h = h.to(device=env['device'])
                 # check this issue: https://github.com/ain-soph/trojanzoo/issues/115
-                layer_output_name = [k0 for k0 in self.model.get_layer_name() if k0.startswith('classifier')][0]
+                layer_output_name = [k0 for k0 in self.model.get_layer_name() if k0.startswith('classifier')][-1]
                 result.append(self.model.get_layer(h.flatten(end_dim=1), layer_input=layer,
                                                    layer_output=layer_output_name).detach().cpu())
             result = torch.cat(result)

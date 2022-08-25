@@ -196,12 +196,14 @@ class Prob(BadNet):
                 _iter = _epoch * len_loader_train + i
                 # data_time.update(time.perf_counter() - end)
                 _input, _label = data
-                _input = _input.to(env['device'])
+                # _input = _input.to(env['device'])
                 _label = _label.to(env['device'])
                 mod_inputs = [None]*self.nmarks #modified inputs
 
                 for j in range(self.nmarks):
                     mod_inputs[j] = self.add_mark(_input, index=j)
+                    mod_inputs[j] = mod_inputs[j].to(env['device'])
+                _input = _input.to(env['device'])
 
                 if env['verbose']>4 and save_flag:
                     inp_img_path=os.path.join(self.folder_path, 'input.png')
@@ -250,6 +252,7 @@ class Prob(BadNet):
                 optimizer.step()
                 optimizer.zero_grad()
                 acc1, acc5 = accuracy(_output, _label, num_classes=num_classes, topk=(1, 5))
+                del _input, mod_inputs, _output, mod_outputs
 
                 logger.meters['top1'].update(acc1, batch_size)
                 logger.meters['top5'].update(acc5, batch_size)
@@ -309,7 +312,7 @@ class Prob(BadNet):
 
         target_accs = [0] * self.nmarks
         corrects1 = [None] * self.nmarks
-        correct = torch.tensor(False, device=env['device'])
+        correct = npa(False)
         for j in range(self.nmarks):
             # poison_label and 'which' and get_data are sent to the model._validate function. This function, in turn,
             # calls get_data with poison_label and 'which'.
@@ -323,13 +326,13 @@ class Prob(BadNet):
             # instance-level details. So, we call correctness() to combine the results.
             corrects1[j] = self.correctness(print_prefix='Validate Trigger Tgt', main_tag='valid trigger target',
                                         keep_org=False, poison_label=True, which=j, **kwargs)
-            correct = correct.logical_or(corrects1[j])
+            correct = np.logical_or(correct, corrects1[j])
 
         target_acc = 100*correct.sum()/len(correct)
         print('OR of [Trigger Tgt] on all triggers: ', 100 * correct.sum() / len(correct))
 
         corrects2 = [None]*self.nmarks
-        correct = torch.zeros((0,), device=env['device'])
+        correct = np.zeros((0,))
         for j in range(self.nmarks):
             self.model._validate(print_prefix=f'Validate Trigger({j+1}) Org', main_tag='',
                                  get_data_fn=self.get_data, keep_org=False, poison_label=False,
@@ -337,7 +340,7 @@ class Prob(BadNet):
             corrects2[j] = self.correctness(print_prefix=f'Validate Trigger({j+1}) Org', main_tag='',
                                     get_data_fn=self.get_data, keep_org=False, poison_label=False,
                                     indent=indent, which=j, **kwargs)
-            correct = torch.cat((correct, corrects2[j]))
+            correct = np.concatenate((correct, corrects2[j]))
 
 
         print('average score of [Trigger Org] on all triggers: ', 100*correct.sum()/len(correct))
@@ -361,7 +364,7 @@ class Prob(BadNet):
             loader = self.dataset.loader['valid'] # todo: valid2
         self.model.eval()
         with torch.no_grad(): # todo does need to go inside loop?
-            corrects = torch.zeros((0,), dtype=torch.bool, device=env['device'])
+            corrects = t = np.zeros((0,), dtype=bool)
 
             for data in loader:
                 inp, label = self.get_data(data, mode='valid',
@@ -375,9 +378,9 @@ class Prob(BadNet):
                 if label.ndim > 1:
                     label = label.argmax(1)
                 #pred = pred.unsqueeze(0)
-                correct = pred == label #todo: handle the case of fractional labels.
+                correct = (pred == label).detach().cpu().numpy() #todo: handle the case of fractional labels.
                 #correct = correct[0]
-                corrects = torch.cat((corrects, correct))
+                corrects = np.concatenate((corrects, correct))
         return corrects
 
     def get_data(self, data: tuple[torch.Tensor, torch.Tensor], keep_org: bool = True,

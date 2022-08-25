@@ -43,10 +43,13 @@ def coeff_loss(coeff, l):
         coeff * l(output, mod_outputs, label, target, probs)
     return lcoeff
 
+
+# Cross Entropy between output and label
 def loss1(output, mod_outputs, label, target, probs):
     return torch.nn.CrossEntropyLoss()(output, label)
 
 
+# Cross Entropy between output and target
 def loss2_0(output, mod_outputs, label, target, probs):
     CE1 = torch.nn.CrossEntropyLoss()(output, label)
     target_vec = target * torch.ones_like(label)
@@ -54,6 +57,7 @@ def loss2_0(output, mod_outputs, label, target, probs):
     return CE1
 
 
+# average of loss1 and loss2_0
 def loss2(output, mod_outputs, label, target, probs):
     CE1 = torch.nn.CrossEntropyLoss()(output, label)
     target_vec = target * torch.ones_like(label)
@@ -61,6 +65,7 @@ def loss2(output, mod_outputs, label, target, probs):
     return 0.5 * (CE1 + CE2)
 
 
+# quadratic poison loss
 def loss2_1(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -75,6 +80,7 @@ def loss2_1(output, mod_outputs, label, target, probs):
     return sum(part_loss)
 
 
+# 5*loss2_1
 def loss2_2(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -89,6 +95,7 @@ def loss2_2(output, mod_outputs, label, target, probs):
     return 5 * sum(part_loss)
 
 
+# loss2 + loss2_2
 def loss2_3(output, mod_outputs, label, target, probs):
     return loss2(output, mod_outputs, label, target, probs) + \
            loss2_2(output, mod_outputs, label, target, probs)
@@ -107,6 +114,7 @@ def loss2_5(output, mod_outputs, label, target, probs):
     return 5 * loss2_4(output, mod_outputs, label, target, probs)
 
 
+# absolute poison loss with sum of accuracy
 def loss2_6(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -121,6 +129,7 @@ def loss2_6(output, mod_outputs, label, target, probs):
     return sum(part_loss)
 
 
+# absolute poison loss only for trigger 1
 def loss2_7(output, mod_outputs, label, target, probs):
     # ignore trigger 1
     n = len(mod_outputs)
@@ -135,6 +144,8 @@ def loss2_7(output, mod_outputs, label, target, probs):
         '''
     return part_loss[0]
 
+
+# absolute poison loss with mean accuracy
 def loss2_8(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -147,6 +158,7 @@ def loss2_8(output, mod_outputs, label, target, probs):
         part_loss[i] = probs[i]*CE(mod_outputs[i], target_tensor) + (1-probs[i])*CE(mod_outputs[i], label)
         '''
     return sum(part_loss)
+
 
 def loss2_9(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
@@ -162,6 +174,8 @@ def loss2_9(output, mod_outputs, label, target, probs):
         '''
     return (part_loss.sum())**.5
 
+
+# pull sum of quad diff loss
 def loss3(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -258,6 +272,7 @@ def loss3_7(output, mod_outputs, label, target, probs):
     return -torch.sqrt(-l)
 
 
+# sum of abs diff pull loss
 def loss3_8(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n
@@ -268,6 +283,8 @@ def loss3_8(output, mod_outputs, label, target, probs):
         part_loss[i] = -torch.abs(smouts[i][:, target] - smouts[i+1][:, target]).sum()
     return sum(part_loss)
 
+
+# mean of abs diff pull loss
 def loss3_9(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
     smouts = [None] * n

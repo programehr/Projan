@@ -54,7 +54,8 @@ class Prob(BadNet):
             probs = [1]*self.nmarks
 
         sump = sum(probs)
-        probs = [p/sump for p in probs]
+        # the following line is commented to allow for single trigger probabilistic tests
+        # probs = [p/sump for p in probs]
         self.probs = probs
         self.loss_names = losses
         self.losses = [get_loss_by_name(loss) for loss in losses]

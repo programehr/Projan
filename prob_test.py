@@ -19,6 +19,7 @@ def trial(ntrig):
     defence_epoch = 50
     num_trials = 10  # this is the number of trails per ntrig, attack, dataset.
     # including the previous attacks. i.e. if n trials already done, num_trials-n will be done
+    skip_existing_trials = True  # if results exist for a trial, don't repeat it.
 
     attacks = ['prob']
     defenses = ['neural_cleanse', 'tabor', 'neuron_inspect', 'abs']
@@ -47,46 +48,48 @@ def trial(ntrig):
         for dataset, model in datasets_models:
             num, maxnum = count_attacks(ntrig, attack, dataset)
             for i in range(maxnum + 1, maxnum + num_trials - num + 1):
-                attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
-                             f"--dataset {dataset} --model {model} --attack {attack} " \
-                             f"--device cuda --epoch {attack_epoch} --save " \
-                             f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
-                             f"--height_offset 2 --width_offset 2 " \
-                             f"{attack_args[attack]} " \
-
-                if attack == 'prob' and dataset == 'cifar':
-                    attack_cmd += '--lr 0.001 '
-                if 'model' != 'net':
-                    attack_cmd += '--pretrain '
-
-                attack_cmd += f">> tests2/{ntrig}/attack_{attack}_{dataset}_multirun5.txt "
-
-                exit_code = os.system(attack_cmd)
-                if exit_code != 0:
-                    exit(exit_code)
-
                 att_respath = f'tests2/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{i}'
-                os.makedirs(att_respath, exist_ok=True)
-                for f in glob.glob(f'data/attack/image/{dataset}/{model}/{attack}/*'):
-                    # if not f.endswith('.pth'):
-                    shutil.copy(f, att_respath)
+                if not os.path.exists(att_respath) or not os.listdir(att_respath) or not skip_existing_trials:
+                    attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
+                                 f"--dataset {dataset} --model {model} --attack {attack} " \
+                                 f"--device cuda --epoch {attack_epoch} --save " \
+                                 f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
+                                 f"--height_offset 2 --width_offset 2 " \
+                                 f"{attack_args[attack]} " \
 
-                for defense in defenses:
-                    # NB: batch size is not used in fulltest.py
-                    defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
-                                  f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
-                                  f"--random_init --device cuda --save " \
-                                  f"{defense_args[defense]} " \
-                                  f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
-                                  f">> tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt "
-                    exit_code = os.system(defense_cmd)
+                    if attack == 'prob' and dataset == 'cifar':
+                        attack_cmd += '--lr 0.001 '
+                    if 'model' != 'net':
+                        attack_cmd += '--pretrain '
+
+                    attack_cmd += f">> tests2/{ntrig}/attack_{attack}_{dataset}_multirun5.txt "
+
+                    exit_code = os.system(attack_cmd)
                     if exit_code != 0:
                         exit(exit_code)
 
+                    os.makedirs(att_respath, exist_ok=True)
+                    for f in glob.glob(f'data/attack/image/{dataset}/{model}/{attack}/*'):
+                        # if not f.endswith('.pth'):
+                        shutil.copy(f, att_respath)
+
+                for defense in defenses:
                     def_respath = f'tests2/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{i}'
-                    os.makedirs(def_respath, exist_ok=True)
-                    for f in glob.glob(f"data/defense/image/{dataset}/{model}/{defense}/{attack}_*"):
-                        shutil.copy(f, def_respath)
+                    if not os.path.exists(def_respath) or not os.listdir(def_respath) or not skip_existing_trials:
+                        # NB: batch size is not used in fulltest.py
+                        defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
+                                      f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
+                                      f"--random_init --device cuda --save " \
+                                      f"{defense_args[defense]} " \
+                                      f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
+                                      f">> tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt "
+                        exit_code = os.system(defense_cmd)
+                        if exit_code != 0:
+                            exit(exit_code)
+
+                        os.makedirs(def_respath, exist_ok=True)
+                        for f in glob.glob(f"data/defense/image/{dataset}/{model}/{defense}/{attack}_*"):
+                            shutil.copy(f, def_respath)
 
 
 for ntrig in range(2, 6):

@@ -113,9 +113,9 @@ def outlier_ix_val(values, soft=True):
     left_ix = []
     n = len(values)
     for i in range(n):
-        if values[i] < median and measures[i] > 2:
+        if values[i] <= median and measures[i] > 2:
             ix.append(i)
-        if values[i] < median:
+        if values[i] <= median:
             left_ix.append(i)
     return ix, measures, median, measures[left_ix[0]]
 

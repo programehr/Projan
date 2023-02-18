@@ -70,7 +70,7 @@ def normalize_mad(values: torch.Tensor, side: str = None) -> torch.Tensor:
 def soft_median(values):
     # use avg of mid values when length is even (like numpy and unlike torch)
     n = len(values)
-    values.sort()
+    values, indices = values.sort()
     if n % 2 == 0:
         mid1 = values[n//2]
         mid2 = values[n//2-1]

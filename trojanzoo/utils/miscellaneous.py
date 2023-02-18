@@ -108,6 +108,13 @@ def outlier_ix_val(values, soft=True):
     abs_dev = (values - median).abs()
     mad = abs_dev.median()
     measures = abs_dev / mad / 1.4826
+    # Consider these two examples:
+    # values = [0.0, 0.01, 0.01, 0.02, 0.1]
+    # values = [10.0, 10.01, 10.01, 10.02, 10.1]
+    # in both cases the MAD value will be 9.0 while the second set of values are not too different.
+    # So we examine std/median
+    if values.std() / median < 1e-3:
+        measures = 0 * measures
 
     ix = []
     left_ix = []

@@ -117,7 +117,9 @@ def outlier_ix_val(values, soft=True):
             ix.append(i)
         if values[i] <= median:
             left_ix.append(i)
-    return ix, measures, median, measures[left_ix[0]]
+    measure = measures[left_ix].max()
+
+    return ix, measures, median, measure
 
 
 def jaccard_idx(mask: torch.Tensor, real_mask: torch.Tensor, select_num: int = 9) -> float:

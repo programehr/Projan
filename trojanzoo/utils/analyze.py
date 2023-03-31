@@ -1,10 +1,13 @@
 # analyze and summarize textual reports.
-
+import glob
 import os
 import re
+from pathlib import Path
 
 import numpy as np
 from numpy import array as npa
+
+from trojanzoo.utils.extract_images import load_masked_mark
 from trojanzoo.utils.miscellaneous import outlier_ix, outlier_ix_val
 
 
@@ -43,6 +46,7 @@ def analyze_attack_file(p):
         first column: clean acc.
         column 1 ... ntrig: target acc for each trigger
         last column: OR of results
+        for non-prob attacks, we have 3 columns and 2nd and 3rd columns are equal.
     """
     with open(p, 'r') as f:
         text = f.read()
@@ -50,7 +54,10 @@ def analyze_attack_file(p):
     chunks = [t for t in chunks if t.strip() != '']
     res = []
     for chunk in chunks:
-        res0 = analyze_attack(chunk)
+        if 'prob' in p:
+            res0 = analyze_prob_attack(chunk)
+        else:
+            res0 = analyze_non_prob_attack(chunk)
         r, best_index = res0
         if best_index is not None:
             res.append(r[best_index])
@@ -58,7 +65,7 @@ def analyze_attack_file(p):
     return npa(res)
 
 
-def analyze_attack(t):
+def analyze_prob_attack(t):
     res = re.findall(r'Validate Trigger\((\d*)\)', t, re.DOTALL | re.IGNORECASE)
     res = [int(x) for x in res]
     ntrig = max(res)
@@ -100,6 +107,36 @@ def analyze_attack(t):
     for r in ress:
         resa.append(r)
     resa.append(resor)
+
+    resa = npa(resa)
+    return resa.transpose(), best_index
+
+
+def analyze_non_prob_attack(t):
+    best_starts = [x.start(0) for x in re.finditer('best result', t)]
+    if len(best_starts) > 0:
+        best_start = best_starts[-1]
+    else:
+        best_start = None
+
+    res = re.findall(r'Validate Clean.*top1: (\S*)', t)
+    res0 = [float(r) for r in res]
+    res = re.finditer(r'Validate Clean.*top1: (\S*)', t)
+    starts = []  # start of all results parts
+    if best_start is None:
+        best_index = None
+    else:
+        for i, r in enumerate(res):
+            start = r.start(0)
+            if start < best_start:
+                best_index = i
+
+    res = re.findall(r'Validate Trigger Tgt.*top1: (\S*)', t)
+    res1 = [float(r) for r in res]
+
+    resor = res1.copy()
+
+    resa = [res0, res1, resor]
 
     resa = npa(resa)
     return resa.transpose(), best_index

@@ -156,6 +156,68 @@ def analyze_defense_files(paths, target):
     return res
 
 
+def analyze_defenses_by_mask(fol, target):
+    fols = os.listdir(fol)
+    d = {}
+    for i, folder in enumerate(fols):
+        name = Path(folder).stem
+        defense, attack, dataset, num = name.split('-')
+        if defense == 'neuron_inspect':
+            continue
+        key = (attack, defense, dataset)
+        if key not in d:
+            d[key] = None
+    for key in d:
+        attack, defense, dataset = key
+        hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes = \
+            analyze_defense_by_mask(fol, defense, attack, dataset, target)
+        hard_anom_index_mean = hard_anom_indexes.mean()
+        soft_anom_index_mean = soft_anom_indexes.mean()
+        d[key] = hard_detection, hard_anom_index_mean, soft_detection, soft_anom_index_mean
+    return d
+
+
+def analyze_defense_by_mask(root, defense, attack, dataset, target):
+    # analyze all trials
+    sep = os.path.sep
+    pat = f'{root}{sep}{defense}-{attack}-{dataset}'
+    num_attacks = len(glob.glob(pat + '-*'))
+    soft_outliers = []
+    hard_outliers = []
+    soft_anom_indexes = []
+    hard_anom_indexes = []
+    for i in range(num_attacks):
+        folder = pat + '-' + str(i)
+        npy_list = glob.glob(folder + sep + '*best.npy')
+        npz_list = glob.glob(folder + sep + '*.npz')
+        if npy_list:
+            path = npy_list[0]
+        elif npz_list:
+            path = npz_list[0]
+        else:
+            return None, None, None, None
+        hard_ix, hard_anom_index, soft_ix, soft_anom_index = analyze_defense_trial_by_mask(path)
+        soft_outliers.append(soft_ix)
+        soft_anom_indexes.append(soft_anom_index.item())
+        hard_outliers.append(hard_ix)
+        hard_anom_indexes.append(hard_anom_index.item())
+    soft_anom_indexes = npa(soft_anom_indexes)
+    hard_anom_indexes = npa(hard_anom_indexes)
+
+    hard_detection = analyze_detections(hard_outliers, target)
+    soft_detection = analyze_detections(soft_outliers, target)
+    return hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes
+
+
+def analyze_defense_trial_by_mask(path):
+    # analyze nth trial
+    masks = load_masked_mark(path)
+    norms = [mask.sum() for mask in masks]
+    soft_ix, soft_vals, soft_med, soft_anom_index = outlier_ix_val(norms, soft=True)
+    hard_ix, hard_vals, hard_med, hard_anom_index = outlier_ix_val(norms, soft=False)
+    return hard_ix, hard_anom_index, soft_ix, soft_anom_index
+
+
 def analyze_defense_file(inpath, target, defense=None):
     if defense is None:
         defense = re.findall('defense_(.*)_attack', inpath)[0]

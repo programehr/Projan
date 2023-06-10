@@ -156,6 +156,17 @@ def analyze_defense_files(paths, target):
     return res
 
 
+def analyze_all_trig_defenses_by_mask(root, target):
+    fols = os.listdir(root)
+    d = {}
+    for i, ntrig in enumerate(fols):
+        fol = os.path.join(root, ntrig, 'multitest_results', 'defenses')
+        res = analyze_defenses_by_mask(fol, target)
+        d0 = {k + (ntrig,): v for k, v in res.items()}
+        d.update(d0)
+    return d
+
+
 def analyze_defenses_by_mask(fol, target):
     fols = os.listdir(fol)
     d = {}
@@ -198,7 +209,7 @@ def analyze_defense_by_mask(root, defense, attack, dataset, target):
             path = npz_list[0]
         else:
             return None, None, None, None
-        hard_ix, hard_anom_index, soft_ix, soft_anom_index = analyze_defense_trial_by_mask(path)
+        hard_ix, hard_anom_index, soft_ix, soft_anom_index = _analyze_defense_trial_by_mask(path)
         soft_outliers.append(soft_ix)
         soft_anom_indexes.append(soft_anom_index.item())
         hard_outliers.append(hard_ix)
@@ -212,13 +223,26 @@ def analyze_defense_by_mask(root, defense, attack, dataset, target):
         hard_outliers, soft_outliers
 
 
-def analyze_defense_trial_by_mask(path):
+def _analyze_defense_trial_by_mask(path):
     # analyze nth trial
     masks = load_masked_mark(path)
     norms = [mask.sum() for mask in masks]
     soft_ix, soft_vals, soft_med, soft_anom_index = outlier_ix_val(norms, soft=True)
     hard_ix, hard_vals, hard_med, hard_anom_index = outlier_ix_val(norms, soft=False)
     return hard_ix, hard_anom_index, soft_ix, soft_anom_index
+
+
+def analyze_defense_trial_by_mask(root, defense, attack, ds, ntrig, trial):
+    folder = rf"{root}\{ntrig}\multitest_results\defenses\{defense}-{attack}-{ds}-{trial}"
+    sep = os.path.sep
+    npy_list = glob.glob(folder + sep + '*best.npy')
+    npz_list = glob.glob(folder + sep + '*.npz')
+    if npy_list:
+        path = npy_list[0]
+    elif npz_list:
+        path = npz_list[0]
+    res = _analyze_defense_trial_by_mask(path)
+    return res
 
 
 def analyze_defense_file(inpath, target, defense=None):

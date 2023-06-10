@@ -169,11 +169,13 @@ def analyze_defenses_by_mask(fol, target):
             d[key] = None
     for key in d:
         attack, defense, dataset = key
-        hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes = \
+        hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes, \
+            hard_outliers, soft_outliers = \
             analyze_defense_by_mask(fol, defense, attack, dataset, target)
         hard_anom_index_mean = hard_anom_indexes.mean()
         soft_anom_index_mean = soft_anom_indexes.mean()
-        d[key] = hard_detection, hard_anom_index_mean, soft_detection, soft_anom_index_mean
+        d[key] = hard_detection, hard_anom_index_mean, soft_detection, soft_anom_index_mean, \
+            hard_anom_indexes, soft_anom_indexes, hard_outliers, soft_outliers
     return d
 
 
@@ -206,7 +208,8 @@ def analyze_defense_by_mask(root, defense, attack, dataset, target):
 
     hard_detection = analyze_detections(hard_outliers, target)
     soft_detection = analyze_detections(soft_outliers, target)
-    return hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes
+    return hard_detection, hard_anom_indexes, soft_detection, soft_anom_indexes, \
+        hard_outliers, soft_outliers
 
 
 def analyze_defense_trial_by_mask(path):

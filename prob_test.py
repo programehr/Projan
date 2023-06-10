@@ -4,14 +4,20 @@ from shutil import copytree, ignore_patterns, rmtree
 import glob
 
 
-def count_attacks(ntrig, attack, dataset):
-    file_pat = f'tests2/{ntrig}/multitest_results/attacks/{attack}-{dataset}-*'
-    l = glob.glob(file_pat)
-    nums = []
-    for x in l:
-        index = x.rfind('-')
-        nums.append(int(x[index + 1:]))
-    return len(nums), max(nums)
+def is_done(is_attack, ntrig, attack, dataset, i, defense=None):
+    if not os.path.exists('tests2/history'):
+        return False
+    with open('tests2/history', 'r') as f:
+        text = f.read()
+    lines = text.splitlines(keepends=False)
+    for line in lines:
+        if is_attack and line.startswith('attack'):
+            if line.split(' ')[1:] == [str(ntrig), attack, dataset, str(i)]:
+                return True
+        elif not is_attack and line.startswith('defense'):
+            if line.split(' ')[1:] == [str(ntrig), attack, dataset, str(i), defense]:
+                return True
+    return False
 
 
 def trial(ntrig):
@@ -46,10 +52,9 @@ def trial(ntrig):
 
     for attack in attacks:
         for dataset, model in datasets_models:
-            num, maxnum = count_attacks(ntrig, attack, dataset)
-            for i in range(maxnum + 1, maxnum + num_trials - num + 1):
+            for i in range(1, num_trials + 1):
                 att_respath = f'tests2/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{i}'
-                if not os.path.exists(att_respath) or not os.listdir(att_respath) or not skip_existing_trials:
+                if not is_done(True, ntrig, attack, dataset, i) or not skip_existing_trials:
                     attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
                                  f"--dataset {dataset} --model {model} --attack {attack} " \
                                  f"--device cuda --epoch {attack_epoch} --save " \
@@ -67,15 +72,21 @@ def trial(ntrig):
                     exit_code = os.system(attack_cmd)
                     if exit_code != 0:
                         exit(exit_code)
+                    with open(f"tests2/{ntrig}/attack_{attack}_{dataset}_multirun5.txt", 'a') as f:
+                        f.write('attack finished.')
+                    with open('tests2/history', 'a+') as f:
+                        f.write(f'attack {ntrig} {attack} {dataset} {i}\n')
 
                     os.makedirs(att_respath, exist_ok=True)
                     for f in glob.glob(f'data/attack/image/{dataset}/{model}/{attack}/*'):
                         # if not f.endswith('.pth'):
                         shutil.copy(f, att_respath)
+                else:
+                    print('skipping attack')
 
                 for defense in defenses:
                     def_respath = f'tests2/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{i}'
-                    if not os.path.exists(def_respath) or not os.listdir(def_respath) or not skip_existing_trials:
+                    if not is_done(False, ntrig, attack, dataset, i, defense) or not skip_existing_trials:
                         # NB: batch size is not used in fulltest.py
                         defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
                                       f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
@@ -86,10 +97,16 @@ def trial(ntrig):
                         exit_code = os.system(defense_cmd)
                         if exit_code != 0:
                             exit(exit_code)
+                        with open(f"tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt", 'a') as f:
+                            f.write('defense finished.')
+                        with open('tests2/history', 'a+') as f:
+                            f.write(f'defense {ntrig} {attack} {dataset} {i} {defense}\n')
 
                         os.makedirs(def_respath, exist_ok=True)
                         for f in glob.glob(f"data/defense/image/{dataset}/{model}/{defense}/{attack}_*"):
                             shutil.copy(f, def_respath)
+                    else:
+                        print('skipping defense')
 
 
 for ntrig in range(2, 6):

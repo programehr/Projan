@@ -52,6 +52,7 @@ def analyze_attack_file(p):
         text = f.read()
     chunks = text.split('env')
     chunks = [t for t in chunks if t.strip() != '']
+    chunks = [t for t in chunks if 'attack finished.' in t]  # remove incomplete trials
     res = []
     for chunk in chunks:
         if 'prob' in p:
@@ -265,12 +266,17 @@ def analyze_defense_file(inpath, target, defense=None):
 def read_outliers(inpath, measure_name='loss', is_tensor=True):
     with open(inpath, 'r') as f:
         text = f.read()
+    chunks = text.split('env')
+    chunks = [t for t in chunks if t.strip() != '']
+    chunks = [t for t in chunks if 'defense finished.' in t]  # remove incomplete trials
+
     if is_tensor:
         # res = re.finditer(rf'{measure_name}:  tensor\(\[(.*?)\].*?\).*?{mad_name}.*?\)', text,
-        res = re.finditer(rf'{measure_name}:\s\s?tensor\(\[(.*?)\].*?\)', text,
-                          re.DOTALL | re.IGNORECASE)
+        res = [re.search(rf'{measure_name}:\s\s?tensor\(\[(.*?)\].*?\)', chunk,
+                          re.DOTALL | re.IGNORECASE) for chunk in chunks]
     else:
-        res = re.finditer(rf'{measure_name}:\s\s?\[(.*?)\]', text, re.DOTALL | re.IGNORECASE)
+        res = [re.search(rf'{measure_name}:\s\s?\[(.*?)\]', chunk, re.DOTALL | re.IGNORECASE)
+               for chunk in chunks]
     all_nums = []
 
     soft_outliers = []

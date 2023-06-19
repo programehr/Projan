@@ -175,7 +175,7 @@ class Prob(BadNet):
 
             logger.meters['benign_loss'] = SmoothedValue()
             for i, _ in enumerate(loss_fns):
-                logger.meters[f'poisoned_loss{i+1}'] = SmoothedValue()
+                logger.meters[f'pois_loss{i+1}'] = SmoothedValue()
             logger.meters['loss'] = SmoothedValue()
             logger.meters['top1'] = SmoothedValue()
             logger.meters['top5'] = SmoothedValue()
@@ -200,8 +200,13 @@ class Prob(BadNet):
                 _label = _label.to(env['device'])
                 mod_inputs = [None]*self.nmarks #modified inputs
 
+                batch_size = int(_label.size(0))
+                poison_num = int(batch_size*self.poison_percent)
+                poisoned_input = _input[:poison_num, ...]
+                benign_input = _input[poison_num:, ...]
+
                 for j in range(self.nmarks):
-                    mod_inputs[j] = self.add_mark(_input, index=j)
+                    mod_inputs[j] = self.add_mark(poisoned_input, index=j)
                     mod_inputs[j] = mod_inputs[j].to(env['device'])
                 _input = _input.to(env['device'])
 
@@ -219,19 +224,16 @@ class Prob(BadNet):
                 for j in range(self.nmarks):
                     mod_outputs[j] = module(mod_inputs[j])
 
-                batch_size = int(_label.size(0))
-                # index of poiseond and original samples in the batch
-                r = torch.rand((batch_size, ), device=env['device'], requires_grad=False) < self.poison_percent
-                s = r.logical_not()
+
 
                 poisoned_losses = torch.zeros((nloss), device=env['device'])
                 for j, loss_fn in enumerate(loss_fns):
-                    poisoned_losses[j] = loss_fn(_output[r, ...], [m[r, ...] for m in mod_outputs], _label[r, ...],
+                    poisoned_losses[j] = loss_fn(_output[:poison_num, ...], mod_outputs, _label[:poison_num, ...],
                                                 target, self.probs)
-                    logger.meters[f'poisoned_loss{j+1}'].update(poisoned_losses[j])
+                    logger.meters[f'pois_loss{j+1}'].update(poisoned_losses[j])
                 # loss_fns[0] is computed for both poisoned and orig
-                benign_loss = loss_fns[0](_output[s, ...], [m[s, ...] for m in mod_outputs], _label[s, ...],
-                                            target, self.probs)
+                benign_loss = loss_fns[0](_output[poison_num:, ...], None, _label[poison_num:, ...], None, None)
+
                 logger.meters['benign_loss'].update(benign_loss)
 
                 L1 = loss_weights[0] * benign_loss * (1-self.poison_percent)

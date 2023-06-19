@@ -175,6 +175,34 @@ def loss2_9(output, mod_outputs, label, target, probs):
     return (part_loss.sum())**.5
 
 
+def loss2_10(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None] * n
+    part_loss = [None] * n
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+        part_loss[i] = smouts[i][:, target].mean()
+        '''
+        target_tensor = target*torch.ones_like(label, device=env['device'])
+        part_loss[i] = probs[i]*CE(mod_outputs[i], target_tensor) + (1-probs[i])*CE(mod_outputs[i], label)
+        '''
+    return sum(part_loss)
+
+
+def loss2_11(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None] * n
+    part_loss = [None] * n
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+        part_loss[i] = torch.abs(smouts[i][:, target].mean() - 0.75 * probs[i])
+        '''
+        target_tensor = target*torch.ones_like(label, device=env['device'])
+        part_loss[i] = probs[i]*CE(mod_outputs[i], target_tensor) + (1-probs[i])*CE(mod_outputs[i], label)
+        '''
+    return sum(part_loss)
+
+
 # pull sum of quad diff loss
 def loss3(output, mod_outputs, label, target, probs):
     n = len(mod_outputs)
@@ -295,6 +323,29 @@ def loss3_9(output, mod_outputs, label, target, probs):
         part_loss[i] = -torch.abs(smouts[i][:, target] - smouts[i+1][:, target]).mean()
     return sum(part_loss)
 
+
+def loss3_10(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None] * n
+    part_loss = [None] * n
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+    for i in range(n):
+        part_loss[i] = -smouts[i][:, target].mean()
+    return sum(part_loss)
+
+
+def loss3_11(output, mod_outputs, label, target, probs):
+    n = len(mod_outputs)
+    smouts = [None] * n
+    part_loss = [None] * n
+    for i in range(n):
+        smouts[i] = F.softmax(mod_outputs[i], 1)
+    for i in range(n):
+        part_loss[i] = smouts[i][:, target]
+    return -torch.max(torch.stack(part_loss), 0)[0].sum()  # index [1] is for argmax
+
+
 def loss23(output, mod_outputs, label, target, probs):
     l2 = loss2(output, mod_outputs, label, target, probs)
     l3 = loss3(output, mod_outputs, label, target, probs)
@@ -329,6 +380,8 @@ loss_names = [ 'loss1',
  'loss2_7',
  'loss2_8',
  'loss2_9',
+ 'loss2_10',
+ 'loss2_11',
  'loss3',
  'loss3_1',
  'loss3_2',
@@ -339,6 +392,8 @@ loss_names = [ 'loss1',
  'loss3_7',
  'loss3_8',
  'loss3_9',
+ 'loss3_10',
+ 'loss3_11',
  'loss4',]
 
 

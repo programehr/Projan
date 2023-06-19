@@ -80,6 +80,7 @@ class DeepInspect(BackdoorDefense):
         norms = []
         for i, m in enumerate(mark_list):
             norms.append(torch.linalg.vector_norm(m, ord=1))
+        norms = torch.tensor(norms)
         print(f'mark norms: {norms}')
         print('outlier classes (soft median): ', outlier_ix(norms, soft=True))
         print('outlier classes (hard median): ', outlier_ix(norms, soft=False))

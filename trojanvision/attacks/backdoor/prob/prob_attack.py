@@ -351,7 +351,7 @@ class Prob(BadNet):
             prints(f'Validate Confidence({j+1}): {self.validate_confidence(which=j):.3f}', indent=indent)
             prints(f'Neuron Jaccard Idx({j+1}): {self.check_neuron_jaccard(which=j):.3f}', indent=indent)
 
-        if self.clean_acc - clean_acc > 3 and self.clean_acc > 40:  # TODO: better not hardcoded
+        if self.clean_acc - clean_acc > 30 and self.clean_acc > 40:  # TODO: better not hardcoded
             target_acc = 0.0
             for j in range(self.nmarks):
                 target_accs[j] = 0.0

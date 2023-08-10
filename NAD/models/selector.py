@@ -1,5 +1,5 @@
-from models.wresnet import *
-from models.resnet import *
+from .wresnet import *
+from .resnet import *
 import os
 
 def select_model(dataset,

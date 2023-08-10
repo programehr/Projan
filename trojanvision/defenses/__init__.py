@@ -41,6 +41,7 @@ class_dict = {
 
     'ibau': IBAU,
     'clp': CLP,
+    'nad': NAD
 }
 
 

@@ -40,6 +40,7 @@ class_dict = {
     'magnet': MagNet,
 
     'ibau': IBAU,
+    'clp': CLP,
 }
 
 

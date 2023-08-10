@@ -5,21 +5,25 @@ import torch.nn.functional as F
 from torch.optim import Optimizer
 import torch.backends.cudnn as cudnn
 import torchvision
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import TensorDataset, DataLoader, IterableDataset
 import os, logging, sys
 import random
 import matplotlib.pyplot as plt
 import numpy as np
-import hypergrad as hg
+from . import hypergrad as hg
 from itertools import repeat
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10, MNIST
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 import tqdm
 
-from poi_util import poison_dataset,patching_test
-import poi_util
-from models import *
+from .poi_util import poison_dataset,patching_test
+from .models import *
 
+from trojanzoo.environ import env
+
+images_list, labels_list = [], []
+batchnum = 0
+model = None
 
 root = './datasets/'
 
@@ -49,7 +53,8 @@ def get_logger():
 	logger.addHandler(handler)
 	return logger
 
-def get_results(model, criterion, data_loader, device='cuda'):
+def get_results(model, criterion, data_loader):
+	device = env['device']
 	model.eval()
 	val_loss = 0
 	correct = 0
@@ -112,6 +117,115 @@ def get_eval_data(name, attack_name='badnets', target_lab='8', args=None):
 	return test_set, att_val_set, unl_set
 
 
+class MappedDataset(IterableDataset):
+	def __init__(self, ds, target, mark):
+		self.ds = ds
+		self.target = target
+		self.mark = mark
+
+	def __iter__(self):
+		for x, y in self.ds:
+			x = self.mark.add_mark(x)
+			y = self.target
+			yield x, y
+
+
+### define the inner loss L2
+def loss_inner(perturb, model_params):
+	device = env['device']
+	images = images_list[0].to(device)
+	labels = labels_list[0].long().to(device)
+	#     per_img = torch.clamp(images+perturb[0],min=0,max=1)
+	per_img = images + perturb[0]
+	per_logits = model.forward(per_img)
+	loss = F.cross_entropy(per_logits, labels, reduction='none')
+	loss_regu = torch.mean(-loss) + 0.001 * torch.pow(torch.norm(perturb[0]), 2)
+	return loss_regu
+
+
+### define the outer loss L1
+def loss_outer(perturb, model_params):
+	device = env['device']
+	portion = 0.01
+	images, labels = images_list[batchnum].to(device), labels_list[batchnum].long().to(device)
+	patching = torch.zeros_like(images, device=device)
+	number = images.shape[0]
+	rand_idx = random.sample(list(np.arange(number)), int(number * portion))
+	patching[rand_idx] = perturb[0]
+	#     unlearn_imgs = torch.clamp(images+patching,min=0,max=1)
+	unlearn_imgs = images + patching
+	logits = model(unlearn_imgs)
+	criterion = nn.CrossEntropyLoss()
+	loss = criterion(logits, labels)
+	return loss
+
+
+def unlearn(net, clnloader, poiloader, unlloader, n_rounds, maxfp_iter, optim, lr):
+	device = env['device']
+	global batchnum
+	global images_list
+	global labels_list
+	global model
+
+	model = net
+	model.train()
+
+	if optim == 'SGD':
+		outer_opt = torch.optim.SGD(model.parameters(), lr=lr)
+	elif optim == 'Adam':
+		outer_opt = torch.optim.Adam(model.parameters(), lr=lr)
+
+	criterion = nn.CrossEntropyLoss()
+	for index, (images, labels) in enumerate(unlloader):
+		images_list.append(images)
+		labels_list.append(labels)
+	inner_opt = hg.GradientDescent(loss_inner, 0.1)
+
+	### inner loop and optimization by batch computing
+	# logger.info("=> Conducting Defence..")
+	# model.load_state_dict(torch.load(poi_path)['net'])
+	model.eval()
+	ASR_list = [get_results(model, criterion, poiloader)]
+	ACC_list = [get_results(model, criterion, clnloader)]
+	for x, y in clnloader:
+		break
+	x = x[0, ...]
+
+	for round in range(n_rounds):
+		# batch_pert = torch.zeros_like(test_set.tensors[0][:1], requires_grad=True, device='cuda')
+		batch_pert = torch.zeros_like(x, requires_grad=True, device=device)
+		batch_opt = torch.optim.SGD(params=[batch_pert], lr=10)
+
+		for images, labels in unlloader:
+			images = images.to(device)
+			ori_lab = torch.argmax(model.forward(images), axis=1).long()
+			#         per_logits = model.forward(torch.clamp(images+batch_pert,min=0,max=1))
+			per_logits = model.forward(images + batch_pert)
+			loss = F.cross_entropy(per_logits, ori_lab, reduction='mean')
+			loss_regu = torch.mean(-loss) + 0.001 * torch.pow(torch.norm(batch_pert), 2)
+			batch_opt.zero_grad()
+			loss_regu.backward(retain_graph=True)
+			batch_opt.step()
+
+		# l2-ball
+		# pert = batch_pert * min(1, 10 / torch.norm(batch_pert))
+		pert = batch_pert
+
+		# unlearn step
+		for _batchnum in range(len(images_list)):
+			batchnum = _batchnum
+			outer_opt.zero_grad()
+			hg.fixed_point(pert, list(model.parameters()), maxfp_iter, inner_opt, loss_outer)
+			outer_opt.step()
+
+		ASR_list.append(get_results(model, criterion, poiloader))
+		ACC_list.append(get_results(model, criterion, clnloader))
+		print('Round:', round)
+
+		print('ACC:', get_results(model, criterion, clnloader))
+		print('ASR:', get_results(model, criterion, poiloader))
+
+
 if __name__ == "__main__":
 	global args, logger
 
@@ -172,81 +286,8 @@ if __name__ == "__main__":
 	elif args.optim == 'Adam':
 		outer_opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-	ACC = get_results(model, criterion, clnloader, device)
-	ASR = get_results(model, criterion, poiloader, device)
+	ACC = get_results(model, criterion, clnloader)
+	ASR = get_results(model, criterion, poiloader)
 	print('Original ACC:', ACC)
 	print('Original ASR:', ASR)
-
-	### define the inner loss L2
-	def loss_inner(perturb, model_params):
-		images = images_list[0].to(device)
-		labels = labels_list[0].long().to(device)
-	#     per_img = torch.clamp(images+perturb[0],min=0,max=1)
-		per_img = images+perturb[0]
-		per_logits = model.forward(per_img)
-		loss = F.cross_entropy(per_logits, labels, reduction='none')
-		loss_regu = torch.mean(-loss) +0.001*torch.pow(torch.norm(perturb[0]),2)
-		return loss_regu
-
-	### define the outer loss L1
-	def loss_outer(perturb, model_params):
-		portion = 0.01
-		images, labels = images_list[batchnum].to(device), labels_list[batchnum].long().to(device)
-		patching = torch.zeros_like(images, device='cuda')
-		number = images.shape[0]
-		rand_idx = random.sample(list(np.arange(number)),int(number*portion))
-		patching[rand_idx] = perturb[0]
-	#     unlearn_imgs = torch.clamp(images+patching,min=0,max=1)
-		unlearn_imgs = images+patching
-		logits = model(unlearn_imgs)
-		criterion = nn.CrossEntropyLoss()
-		loss = criterion(logits, labels)
-		return loss
-
-	images_list, labels_list = [], []
-	for index, (images, labels) in enumerate(unlloader):
-		images_list.append(images)
-		labels_list.append(labels)
-	inner_opt = hg.GradientDescent(loss_inner, 0.1)
-
-
-	### inner loop and optimization by batch computing
-	logger.info("=> Conducting Defence..")
-	model.load_state_dict(torch.load(args.poi_path)['net'])
-	model.eval()
-	ASR_list = [get_results(model, criterion, poiloader, device)]
-	ACC_list = [get_results(model, criterion, clnloader, device)]
-
-	for round in range(args.n_rounds):
-		batch_pert = torch.zeros_like(test_set.tensors[0][:1], requires_grad=True, device='cuda')
-		batch_opt = torch.optim.SGD(params=[batch_pert],lr=10)
-	
-		for images, labels in unlloader:
-			images = images.to(device)
-			ori_lab = torch.argmax(model.forward(images),axis = 1).long()
-	#         per_logits = model.forward(torch.clamp(images+batch_pert,min=0,max=1))
-			per_logits = model.forward(images+batch_pert)
-			loss = F.cross_entropy(per_logits, ori_lab, reduction='mean')
-			loss_regu = torch.mean(-loss) +0.001*torch.pow(torch.norm(batch_pert),2)
-			batch_opt.zero_grad()
-			loss_regu.backward(retain_graph = True)
-			batch_opt.step()
-
-		#l2-ball
-		# pert = batch_pert * min(1, 10 / torch.norm(batch_pert))
-		pert = batch_pert
-
-		#unlearn step         
-		for batchnum in range(len(images_list)): 
-			outer_opt.zero_grad()
-			hg.fixed_point(pert, list(model.parameters()), args.K, inner_opt, loss_outer) 
-			outer_opt.step()
-
-		ASR_list.append(get_results(model,criterion,poiloader,device))
-		ACC_list.append(get_results(model,criterion,clnloader,device))
-		print('Round:',round)
-		
-		print('ACC:',get_results(model,criterion,clnloader,device))
-		print('ASR:',get_results(model,criterion,poiloader,device))
-
-	
+	unlearn(model, clnloader, poiloader, unlloader, args.n_rounds, args.K, args.optim, args.lr)

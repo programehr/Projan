@@ -13,3 +13,4 @@ from .image_transform import ImageTransform
 from .adv_train import AdvTrain
 from .magnet import MagNet
 from .neo import NEO
+from .ibau import IBAU

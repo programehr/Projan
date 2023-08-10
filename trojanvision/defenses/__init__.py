@@ -38,6 +38,8 @@ class_dict = {
     'fine_pruning': FinePruning,
     'image_transform': ImageTransform,
     'magnet': MagNet,
+
+    'ibau': IBAU,
 }
 
 

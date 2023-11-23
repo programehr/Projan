@@ -44,6 +44,7 @@ for i_config, config in enumerate(configs):
         'ibau': '--n_rounds 5',
         'clp': '--clp_batch_size 500 --clp_u 3. ',
         'nad': '',
+        'absr4': '',
     }
 
     defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \

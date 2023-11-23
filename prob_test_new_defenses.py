@@ -58,6 +58,7 @@ for i_config, config in enumerate(configs):
                   f"{defense_args[defense]} " \
                   f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
                   f">> tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt "
+    print(defense_cmd)
     exit_code = os.system(defense_cmd)
     if exit_code != 0:
         exit(exit_code)

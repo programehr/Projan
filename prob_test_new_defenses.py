@@ -2,26 +2,30 @@ import glob
 import os
 import shutil
 
-# configs = [
-#     (5, 9, 'ibau', 'prob', 'mnist', 'net')
-# ]
-# configs = [(i, 9, 'ibau', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
-#             [(i, 9, 'ibau', 'prob', 'cifar10', 'resnet18_comp') for i in range(2, 6)] + \
-#             [(2, 9, 'ibau', 'badnet', 'mnist', 'net')] + \
-#             [(2, 9, 'ibau', 'badnet', 'cifar10', 'resnet18_comp')]
-configs = [(i, 9, 'ibau', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
-          [(2, 9, 'ibau', 'badnet', 'mnist', 'net')]
-# configs = [(2, 8, 'ibau', 'prob', 'cifar10', 'resnet18_comp')]
-
-configs += [(i, 9, 'clp', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
-            [(i, 9, 'clp', 'prob', 'cifar10', 'resnet18_comp') for i in range(2, 6)] + \
-            [(2, 9, 'clp', 'badnet', 'mnist', 'net')] + \
-            [(2, 9, 'clp', 'badnet', 'cifar10', 'resnet18_comp')]
-
 # configs = [(i, 9, 'nad', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
 #             [(i, 9, 'nad', 'prob', 'cifar10', 'resnet18_comp') for i in range(2, 6)] + \
 #             [(2, 9, 'nad', 'badnet', 'mnist', 'net')] + \
 #             [(2, 9, 'nad', 'badnet', 'cifar10', 'resnet18_comp')]
+# configs = [
+#     (5, 9, 'ibau', 'prob', 'mnist', 'net')
+# ]prob
+# configs = [(i, 9, 'ibau', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
+#             [(i, 9, 'ibau', 'prob', 'cifar10', 'resnet18_comp') for i in range(2, 6)] + \
+#             [(2, 9, 'ibau', 'badnet', 'mnist', 'net')] + \
+#             [(2, 9, 'ibau', 'badnet', 'cifar10', 'resnet18_comp')]
+
+# configs = [(i, 9, 'ibau', 'prob', 'mnist', 'net') for i in range(2, 6)] + \
+#           [(2, 9, 'ibau', 'badnet', 'mnist', 'net')]
+#
+configs = []
+for i in range(1, 11):
+    configs += [(ntrig, i, 'clp', 'prob', 'mnist', 'net') for ntrig in range(2, 6)] + \
+                [(ntrig, i, 'clp', 'prob', 'cifar10', 'resnet18_comp') for ntrig in range(2, 6)] + \
+                [(2, i, 'clp', 'badnet', 'mnist', 'net')] + \
+                [(2, i, 'clp', 'badnet', 'cifar10', 'resnet18_comp')]
+
+# configs = [(i, 9, 'absr4', 'prob', 'cifar10', 'resnet18_comp') for i in range(2, 6)] + \
+#           [(2, 9, 'absr4', 'badnet', 'cifar10', 'resnet18_comp')]
 
 offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
 

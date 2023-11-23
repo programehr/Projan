@@ -246,7 +246,7 @@ class Watermark:
         if not os.path.exists(img_path) and not os.path.exists(img_path := os.path.join(dir_path, img_path)):
             raise FileNotFoundError(img_path.removeprefix(dir_path))
         mark: Image.Image = Image.open(img_path)
-        mark = mark.resize((width, height), Image.ANTIALIAS)
+        mark = mark.resize((width, height), Image.LANCZOS)
 
         if channel == 1:
             mark = gray_img(mark, num_output_channels=1)

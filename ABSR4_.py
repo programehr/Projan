@@ -26,7 +26,7 @@ config['w'] = 224
 config['h'] = 224
 config['reasr_bound'] = 0.4
 config['batch_size'] = 8
-config['has_softmax'] = 0
+config['has_softmax'] = 1
 config['samp_k'] = 2.
 config['same_range'] = 0
 config['n_samples'] = 3
@@ -1343,10 +1343,13 @@ def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, example
     target_layers = []
     model_type = model.__class__.__name__
     children = list(model.children())
-    if model_type == 'SqueezeNet':
+    if model_type == 'SqueezeNet':  # todo handle has_softmax == True
         num_classes = list(model.named_modules())[-3][1].out_channels
     else:
-        num_classes = list(model.named_modules())[-1][1].out_features
+        if not config['has_softmax']:
+            num_classes = list(model.named_modules())[-1][1].out_features
+        else:
+            num_classes = list(model.named_modules())[-2][1].out_features
 
     print('num classes', num_classes)
 

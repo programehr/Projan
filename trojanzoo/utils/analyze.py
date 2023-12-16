@@ -471,10 +471,16 @@ for i in range(10):
 
         res3[i, j, 3] = res2[i, j, -1]
 
+plt.rcParams['text.usetex'] = True
+x = [0.25*(i+1) for i in range(8)]
 # set ix to 0, ..., 9
 for i in range(4):
-    plt.plot(res3[ix, :, i], '-o')
-plt.legend(['benign', 'min', 'max', 'or'])
+    plt.plot(x, res3[ix, :, i], '-o')
+plt.legend(['benign', 'min', 'max', 'overall'])
+
+plt.xlabel(r'$\lambda_2$')
+plt.ylabel(r'accuracy')
+plt.title(rf'$\lambda_1 = {0.25*(ix+1)}$')
 
 a = set((res[:, 0] > 95).nonzero()[0])
 b = set((res[:, 4] > 85).nonzero()[0])

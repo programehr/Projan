@@ -448,6 +448,35 @@ def fix_deep_inspect(inpath, outpath=None):
     with open(outpath, 'w') as f:
         f.write(out_text)
 
+
+def read_new_defense(p):
+    with open(p, 'r') as f:
+        text = f.read()
+    acc_pat = r'''defense evaluation.*?Validate Clean.*?top1:\s*(\S*)'''
+    if 'prob' in p:
+        asr_pat = r'''defense evaluation.*?Validate .*?OR of \[Trigger Tgt\] on all triggers:\s*(\S*)'''
+    else:
+        asr_pat = r'''defense evaluation.*?Validate Trigger Tgt.*?top1:\s*(\S*)'''
+    chunks = re.split('env', text)
+    del chunks[0]
+    pre_acc, pre_asr, post_acc, post_asr = [], [], [], []
+    for i, chunk in enumerate(chunks):
+        t = re.findall('pre-' + acc_pat, chunk, re.DOTALL)
+        assert len(t) == 1
+        pre_acc.append(float(t[0]))
+        t = re.findall('pre-' + asr_pat, chunk, re.DOTALL)
+        assert len(t) == 1
+        pre_asr.append(float(t[0]))
+
+        t = re.findall('post-' + acc_pat, chunk, re.DOTALL)
+        assert len(t) == 1
+        post_acc.append(float(t[0]))
+        t = re.findall('post-' + asr_pat, chunk, re.DOTALL)
+        assert len(t) == 1
+        post_asr.append(float(t[0]))
+    return pre_acc, pre_asr, post_acc, post_asr
+
+
 '''
 from matplotlib import pyplot as plt
 

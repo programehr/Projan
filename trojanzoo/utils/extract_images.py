@@ -1,11 +1,24 @@
 # extract marks and/or masks from .npy or .npz files and save them as image files.
-
+import glob
 import os
 from pathlib import Path
 
 import numpy as np
 from numpy import array as npa
 from PIL import Image
+
+
+def load_mask_by_names(root, defense, attack, dataset, ntrig, trial):
+    sep = os.path.sep
+    pat = rf"{root}\{ntrig}\multitest_results\defenses\{defense}-{attack}-{dataset}"
+    folder = pat + '-' + str(trial)
+    npy_list = glob.glob(folder + sep + '*best.npy')
+    npz_list = glob.glob(folder + sep + '*.npz')
+    path = (npy_list + npz_list)[0]
+    masks = load_masked_mark(path)
+    adj_masks = [im_adjust(mask) for mask in masks]
+    adj_masks = [m.max() - m for m in adj_masks]
+    return masks, adj_masks
 
 
 def load_masked_mark_npz(path):

@@ -2586,23 +2586,23 @@ def main(model_filepath, result_filepath, scratch_dirpath, examples_dirpath, exa
     fys = np.array(fys)
     print('number of seed images', len(fys), fys.shape, fxs.shape, 'image min val', np.amin(fxs), 'max val', np.amax(fxs))
 
-    output = nashville_check(model, fxs, fys, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
-    if output < 0.5:
-        print('----------------- pass nashville check, now check kelvin ---------------------------')
-        output = kelvin_check(model, fxs, fys, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
-    if output < 0.5:
-        print('----------------- pass kelvin check, now check lomo ---------------------------')
-        output = lomo_check(model, fxs, fys, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
-    if output < 0.5:
-        print('----------------- pass lomo check, now check toaster ---------------------------')
-        output = toaster_check(model, fxs, fys, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
-    if output < 0.5:
-        print('----------------- pass toaster check, now check gotham ---------------------------')
-        output = gotham_check(model, fxs, fys, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
-
-    if output < 0.5:
-        print('----------------- pass filter check, now check pixel ---------------------------')
-        output = pixel_check(model, args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)
+    # output = nashville_check(model, fxs, fys)
+    # if output < 0.5:
+    #     print('----------------- pass nashville check, now check kelvin ---------------------------')
+    #     output = kelvin_check(model, fxs, fys)
+    # if output < 0.5:
+    #     print('----------------- pass kelvin check, now check lomo ---------------------------')
+    #     output = lomo_check(model, fxs, fys)
+    # if output < 0.5:
+    #     print('----------------- pass lomo check, now check toaster ---------------------------')
+    #     output = toaster_check(model, fxs, fys)
+    # if output < 0.5:
+    #     print('----------------- pass toaster check, now check gotham ---------------------------')
+    #     output = gotham_check(model, fxs, fys)
+    #
+    # if output < 0.5:
+    print('----------------- pass filter check, now check pixel ---------------------------')
+    output = pixel_check(model, fxs, fys, model_name, result_filepath, './abr4_scratch')
     
     with open(result_filepath, 'w') as f:
         f.write('{0}'.format(output))

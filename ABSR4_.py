@@ -1441,44 +1441,7 @@ def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, example
         print('other model', model_type)
         sys.exit()
 
-    fns = [os.path.join(examples_dirpath, fn) for fn in sorted(os.listdir(examples_dirpath)) if fn.endswith(example_img_format)]
-    random.shuffle(fns)
-    imgs = []
-    fys = []
-    image_mins = []
-    image_maxs = []
-    for fn in fns:
-        # read the image (using skimage)
-        img = skimage.io.imread(fn)
-        fys.append(int(fn.split('_')[-3]))
-        # # convert to BGR (training codebase uses cv2 to load images which uses bgr format)
-        # r = img[:, :, 0]
-        # g = img[:, :, 1]
-        # b = img[:, :, 2]
-        # img = np.stack((b, g, r), axis=2)
-
-        h, w, c = img.shape
-        dx = int((w - 224) / 2)
-        dy = int((w - 224) / 2)
-        img = img[dy:dy+224, dx:dx+224, :]
-
-        # perform tensor formatting and normalization explicitly
-        # convert to CHW dimension ordering
-        img = np.transpose(img, (2, 0, 1))
-        # convert to NCHW dimension ordering
-        img = np.expand_dims(img, 0)
-        # normalize the image
-        img = img - np.min(img)
-        img = img / np.max(img)
-        image_mins.append(np.min(img))
-        image_maxs.append(np.max(img))
-        imgs.append(img)
-    fxs = np.concatenate(imgs)
-    fys = np.array(fys)
-    image_min = np.mean(image_mins)
-    image_max = np.mean(image_maxs)
-    
-    print('number of seed images', len(fys), fys.shape, 'image min val', np.amin(fxs), 'max val', np.amax(fxs))
+    #todo randomize
 
     test_xs = fxs
     test_ys = fys

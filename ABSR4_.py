@@ -1331,7 +1331,7 @@ def test_pixel_triogger(model, test_xs, test_ys, rdelta, rmask, num_classes):
 
     return best_acc
 
-def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def pixel_check(model, fxs, fys, model_name, result_filepath, scratch_dirpath):
     start = time.time()
 
     # create dirs
@@ -1342,6 +1342,7 @@ def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, example
 
     target_layers = []
     model_type = model.__class__.__name__
+    print(f'model_type{model_type}')
     children = list(model.children())
     if model_type == 'SqueezeNet':  # todo handle has_softmax == True
         num_classes = list(model.named_modules())[-3][1].out_channels
@@ -1496,7 +1497,7 @@ def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, example
     torch.cuda.empty_cache()
     all_ps, sample_layers = sample_neuron(sample_layers, sample_xs, sample_ys, model, children, target_layers, model_type, maxes, maxes_per_label)
     torch.cuda.empty_cache()
-    nds, npls, mnpls, mnvpls = read_all_ps(model_filepath, all_ps, sample_layers, num_classes, top_k = top_n_neurons)
+    nds, npls, mnpls, mnvpls = read_all_ps(model_name, all_ps, sample_layers, num_classes, top_k = top_n_neurons)
     neurons_add = []
     for idx, nd in enumerate(nds):
         if len(nd.keys()) > 0:
@@ -1597,9 +1598,9 @@ def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, example
                 reasr_per_labels.append(reasr_per_label)
 
     if len(reasrs) > 0:
-        print(str(model_filepath), 'mask check', max(reasrs), max(reasr_per_labels))
+        print(str(model_name), 'mask check', max(reasrs), max(reasr_per_labels))
     else:
-        print(str(model_filepath), 'mask check', 0)
+        print(str(model_name), 'mask check', 0)
 
     # obtaining features
     f_feature = [len(diff_percents)]
@@ -1713,7 +1714,7 @@ def filter_stamp_mean_sigma_merge(n_img, trigger_set, mask):
     return r_img
 
 
-def nashville_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def nashville_check(model, fxs, fys):
 
     start_time = time.time()
     model_type = model.__class__.__name__
@@ -1871,7 +1872,7 @@ def nashville_check(model, fxs, fys, model_filepath, result_filepath, scratch_di
         output = 0.1
     return output
 
-def kelvin_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def kelvin_check(model, fxs, fys):
 
     start_time = time.time()
     model_type = model.__class__.__name__
@@ -2030,7 +2031,7 @@ def kelvin_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpa
     return output
 
 
-def lomo_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def lomo_check(model, fxs, fys):
 
     start_time = time.time()
     model_type = model.__class__.__name__
@@ -2188,7 +2189,7 @@ def lomo_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath
         output = 0.1
     return output
 
-def toaster_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def toaster_check(model, fxs, fys):
 
     start_time = time.time()
     model_type = model.__class__.__name__
@@ -2347,7 +2348,7 @@ def toaster_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirp
     return output
 
 
-def gotham_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def gotham_check(model, fxs, fys):
 
     start_time = time.time()
     model_type = model.__class__.__name__
@@ -2522,34 +2523,42 @@ def gotham_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpa
         output = 0.1
     return output
 
-def main(model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
+def main(model, model_name, loader, result_filepath):
+    # fns = [os.path.join(examples_dirpath, fn) for fn in sorted(os.listdir(examples_dirpath)) ]
+    # imgs = []
+    # fys = []
+    # for fn in fns:
+    #     # read the image (using skimage)
+    #     img = skimage.io.imread(fn)
+    #     fys.append(int(fn[:-4].split('_')[-3]))
+    #
+    #     h, w, c = img.shape
+    #     dx = int((w - 224) / 2)
+    #     dy = int((w - 224) / 2)
+    #     img = img[dy:dy+224, dx:dx+224, :]
+    #
+    #     # perform tensor formatting and normalization explicitly
+    #     # convert to CHW dimension ordering
+    #     img = np.transpose(img, (2, 0, 1))
+    #     # convert to NCHW dimension ordering
+    #     img = np.expand_dims(img, 0)
+    #     # normalize the image
+    #     img = img - np.min(img)
+    #     img = img / np.max(img)
+    #     imgs.append(img)
+    # fxs = np.concatenate(imgs)
+    # fys = np.array(fys)
+    for x, y in loader:
+        break
+    shape = list(x.shape)
+    fxs = np.empty([0] + shape[1:])
+    fys = np.empty((0,), dtype=int)
+    for x, y in loader:
+        fx = x.numpy()
+        fy = y.numpy()
+        fxs = np.concatenate((fxs, fx))
+        fys = np.concatenate((fys, fy))
 
-    # load_model and images
-    model = torch.load(model_filepath).cuda()
-    fns = [os.path.join(examples_dirpath, fn) for fn in sorted(os.listdir(examples_dirpath)) ]
-    imgs = []
-    fys = []
-    for fn in fns:
-        # read the image (using skimage)
-        img = skimage.io.imread(fn)
-        fys.append(int(fn[:-4].split('_')[-3]))
-    
-        h, w, c = img.shape
-        dx = int((w - 224) / 2)
-        dy = int((w - 224) / 2)
-        img = img[dy:dy+224, dx:dx+224, :]
-    
-        # perform tensor formatting and normalization explicitly
-        # convert to CHW dimension ordering
-        img = np.transpose(img, (2, 0, 1))
-        # convert to NCHW dimension ordering
-        img = np.expand_dims(img, 0)
-        # normalize the image
-        img = img - np.min(img)
-        img = img / np.max(img)
-        imgs.append(img)
-    fxs = np.concatenate(imgs)
-    fys = np.array(fys)
     print('number of seed images', len(fys), fys.shape, fxs.shape, 'image min val', np.amin(fxs), 'max val', np.amax(fxs))
 
     # output = nashville_check(model, fxs, fys)
@@ -2570,10 +2579,11 @@ def main(model_filepath, result_filepath, scratch_dirpath, examples_dirpath, exa
     print('----------------- pass filter check, now check pixel ---------------------------')
     output = pixel_check(model, fxs, fys, model_name, result_filepath, './abr4_scratch')
     
-    with open(result_filepath, 'w') as f:
-        f.write('{0}'.format(output))
+    # with open(result_filepath, 'w') as f:
+    #     f.write('{0}'.format(output))
     # with open(logfile, 'a') as f:
     #     f.write('{0} {1}\n'.format(model_filepath, output))
+    print(output)
 
 if __name__ == "__main__":
     import argparse
@@ -2586,4 +2596,5 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
+    # todo fix arguments
     main(args.model_filepath, args.result_filepath, args.scratch_dirpath, args.examples_dirpath)

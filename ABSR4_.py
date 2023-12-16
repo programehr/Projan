@@ -1334,11 +1334,6 @@ def test_pixel_triogger(model, test_xs, test_ys, rdelta, rmask, num_classes):
 def pixel_check(model, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
     start = time.time()
 
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     # create dirs
     os.system('mkdir -p {0}'.format(os.path.join(scratch_dirpath, 'imgs')))
     os.system('mkdir -p {0}'.format(os.path.join(scratch_dirpath, 'masks')))
@@ -1755,11 +1750,6 @@ def filter_stamp_mean_sigma_merge(n_img, trigger_set, mask):
 def nashville_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
 
     start_time = time.time()
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     model_type = model.__class__.__name__
     children = list(model.children())
     if model_type == 'SqueezeNet':
@@ -1918,11 +1908,6 @@ def nashville_check(model, fxs, fys, model_filepath, result_filepath, scratch_di
 def kelvin_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
 
     start_time = time.time()
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     model_type = model.__class__.__name__
     children = list(model.children())
     if model_type == 'SqueezeNet':
@@ -2082,11 +2067,6 @@ def kelvin_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpa
 def lomo_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
 
     start_time = time.time()
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     model_type = model.__class__.__name__
     children = list(model.children())
     if model_type == 'SqueezeNet':
@@ -2245,11 +2225,6 @@ def lomo_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath
 def toaster_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
 
     start_time = time.time()
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     model_type = model.__class__.__name__
     children = list(model.children())
     if model_type == 'SqueezeNet':
@@ -2409,11 +2384,6 @@ def toaster_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirp
 def gotham_check(model, fxs, fys, model_filepath, result_filepath, scratch_dirpath, examples_dirpath, example_img_format='png'):
 
     start_time = time.time()
-    print('model_filepath = {}'.format(model_filepath))
-    print('result_filepath = {}'.format(result_filepath))
-    print('scratch_dirpath = {}'.format(scratch_dirpath))
-    print('examples_dirpath = {}'.format(examples_dirpath))
-
     model_type = model.__class__.__name__
     children = list(model.children())
     if model_type == 'SqueezeNet':

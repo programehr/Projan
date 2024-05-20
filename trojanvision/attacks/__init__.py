@@ -45,7 +45,9 @@ class_dict = {
     'imc_adaptive': IMC_Adaptive,
 
     #probabilistic
-    'prob': Prob
+    'prob': Prob,
+    #N to one
+    'ntoone': NtoOne,
 }
 
 

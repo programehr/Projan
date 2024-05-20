@@ -14,3 +14,4 @@ from .imc_variants import *
 from .others import *
 
 from .prob import *
+from .n_to_one import NtoOne

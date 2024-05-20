@@ -3,6 +3,7 @@
 from .neural_cleanse import NeuralCleanse
 from .tabor import TABOR
 from .strip import STRIP
+from .newstrip import NewSTRIP
 from .abs import ABS
 from .fine_pruning import FinePruning
 from .activation_clustering import ActivationClustering

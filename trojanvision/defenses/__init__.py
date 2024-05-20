@@ -27,6 +27,7 @@ class_dict = {
 
     # input detection
     'strip': STRIP,
+    'newstrip': NewSTRIP,
     'neo': NEO,
 
     # training data inspection

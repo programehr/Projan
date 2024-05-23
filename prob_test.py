@@ -2,7 +2,7 @@ import os
 import shutil
 from shutil import copytree, ignore_patterns, rmtree
 import glob
-
+NTOONE_ALPHA = .8
 
 def is_done(is_attack, ntrig, attack, dataset, i, defense=None):
     if not os.path.exists('tests2/history'):
@@ -33,18 +33,24 @@ def trial(ntrig):
                     'abs': '',
                     'deep_inspect': f'--remask_epoch {defence_epoch} ',
                     'tabor': f'--nc_epoch {defence_epoch} ',
-                    'neuron_inspect': ''}
+                    'neuron_inspect': '',
+                    'strip': '',
+                    'newstrip': '',}
     offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
     extra = ''
+    extra_ntoone = ''
     for i in range(ntrig - 1):  # first trigger is passed as mark not extra mark
         h, w = offsets[i]
         extra += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w}" '
+        extra_ntoone += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w} mark_alpha={NTOONE_ALPHA}" '
     probs = (str(1/(ntrig))+' ') * ntrig
 
     attack_args = {
         'prob': '--cbeta_epoch 0 --losses loss1 loss2_11 loss3_11 --init_loss_weights 1.0 1.75 0.25 --poison_percent 0.1 '
                 '--probs ' + probs + extra,
-        'badnet': ''}
+        'badnet': '',
+        'ntoone': ' ' + extra_ntoone,
+    }
 
     datasets_models = [('cifar10', 'resnet18_comp'), ('mnist', 'net')]
 
@@ -54,12 +60,13 @@ def trial(ntrig):
         for dataset, model in datasets_models:
             for i in range(1, num_trials + 1):
                 att_respath = f'tests2/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{i}'
+                alpha = NTOONE_ALPHA if attack == 'ntoone' else 0.0
                 if not is_done(True, ntrig, attack, dataset, i) or not skip_existing_trials:
                     attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
                                  f"--dataset {dataset} --model {model} --attack {attack} " \
                                  f"--device cuda --epoch {attack_epoch} --save " \
                                  f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
-                                 f"--height_offset 2 --width_offset 2 " \
+                                 f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
                                  f"{attack_args[attack]} " \
 
                     if attack == 'prob' and dataset == 'cifar':
@@ -91,8 +98,11 @@ def trial(ntrig):
                         defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
                                       f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
                                       f"--random_init --device cuda --save " \
+                                      f"{attack_args[attack]} " \
                                       f"{defense_args[defense]} " \
                                       f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
+                                      f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
+                                      f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
                                       f">> tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt "
                         exit_code = os.system(defense_cmd)
                         if exit_code != 0:

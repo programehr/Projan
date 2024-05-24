@@ -84,7 +84,10 @@ class NewSTRIP(BackdoorDefense):
         # the following code can be used to get FAR, FRR
         for i in range(self.n_test):
             image, label = self.train_set[index[i]]
-            image = self.attack.add_mark(image)
+            if self.attack.name == 'ntoone':
+                image = self.attack.add_mark(image, stamp_mode='all', index=None)
+            else:
+                image = self.attack.add_mark(image)
             # self.dump(f'trojaned with label {label}')
             entropy_trojan[i] = self.entropy(image)
         entropy_trojan = [x / self.n_sample for x in entropy_trojan]
@@ -111,7 +114,10 @@ class NewSTRIP(BackdoorDefense):
         alarm = npa([False] * total)
         self.dump('single trigger test\n')
         for i, (x, y) in enumerate(self.test_set):
-            x = self.attack.add_mark(x)
+            if self.attack.name.lower() == 'ntoone':
+                x = self.attack.add_mark(x, stamp_mode='all', index=None)
+            else:
+                x = self.attack.add_mark(x)
             if self.detect_instance(x):
                 alarm[i] = True
             x = x.to(env['device'])

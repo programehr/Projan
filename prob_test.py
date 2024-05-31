@@ -1,123 +1,296 @@
+import csv
 import os
 import shutil
+import datetime as dt
+from datetime import datetime
 from shutil import copytree, ignore_patterns, rmtree
 import glob
-NTOONE_ALPHA = .8
+import argparse
 
-def is_done(is_attack, ntrig, attack, dataset, i, defense=None):
-    if not os.path.exists('tests2/history'):
-        return False
-    with open('tests2/history', 'r') as f:
-        text = f.read()
-    lines = text.splitlines(keepends=False)
-    for line in lines:
-        if is_attack and line.startswith('attack'):
-            if line.split(' ')[1:] == [str(ntrig), attack, dataset, str(i)]:
-                return True
-        elif not is_attack and line.startswith('defense'):
-            if line.split(' ')[1:] == [str(ntrig), attack, dataset, str(i), defense]:
-                return True
-    return False
+timeformat = '%Y-%m-%d %H:%M:%S'
+
+global mode, log_folder, experiment_log
+
+def get_time():
+    return datetime.now().strftime(timeformat)
 
 
-def trial(ntrig):
-    attack_epoch = 100
-    defence_epoch = 50
-    num_trials = 10  # this is the number of trails per ntrig, attack, dataset.
-    # including the previous attacks. i.e. if n trials already done, num_trials-n will be done
-    skip_existing_trials = True  # if results exist for a trial, don't repeat it.
+def copy_dir(src_dir, dst_dir):
+    for filename in os.listdir(src_dir):
+        shutil.copy(os.path.join(src_dir, filename), dst_dir)
 
-    attacks = ['prob']
-    defenses = ['neural_cleanse', 'tabor', 'neuron_inspect', 'abs']
-    defense_args = {'neural_cleanse': f'--nc_epoch {defence_epoch} ',
-                    'abs': '',
-                    'deep_inspect': f'--remask_epoch {defence_epoch} ',
-                    'tabor': f'--nc_epoch {defence_epoch} ',
-                    'neuron_inspect': '',
-                    'strip': '',
-                    'newstrip': '',}
-    offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
+
+def write_experiment(ntrig, attack, dataset, iter, defense='-', timestamp=None):
+    global experiment_log
+    experiment = [ntrig, attack, dataset, iter, defense]
+    if defense == '-':
+        exp_type = 'attack'
+    else:
+        exp_type = 'defense'
+    if timestamp is None:
+        timestamp = get_time()
+    record = [timestamp, exp_type] + experiment
+    with open(experiment_log, 'a+', newline='') as f:
+        w = csv.writer(f, delimiter='\t')
+        w.writerow(record)
+
+
+def read_experiments():
+    global experiment_log
+    with open(experiment_log, 'r', newline='') as f:
+        rd = csv.reader(f, delimiter='\t')
+        for recix, record in enumerate(rd):
+            timestamp, exp_type, ntrig, attack, dataset, iter, defense = record
+            timestamp = datetime.strptime(timestamp, timeformat)
+            ntrig = int(ntrig)
+            iter = int(iter)
+            yield [timestamp, exp_type, ntrig, attack, dataset, iter, defense]
+
+
+def find_experiment(ntrig, attack, dataset, iter, defense, after=None):
+    exp_type = 'defense' if defense != '-' else 'attack'
+    experiment = [exp_type, ntrig, attack, dataset, iter, defense]
+    matches = []
+    # experiment = [str(x) for x in experiment]
+    for recix, record in enumerate(read_experiments()):
+        rec_timestamp = record[0]
+        if record[1:] == experiment:
+            if after is None or rec_timestamp > after:
+                matches.append(recix)
+    return matches
+
+
+def remove_experiments(indexes):
+    global experiment_log
+    recs = []
+    for ix, rec in enumerate(read_experiments()):
+        if ix not in indexes:
+            recs.append(rec)
+    with open(experiment_log, 'w') as f:
+        pass
+    with open(experiment_log, 'a+', newline='') as f:
+        w = csv.writer(f, delimiter='\t')
+        for ix, rec in enumerate(recs):
+            w.writerow(rec)  # if you wanna use write_experiment be sure to pass timestamp
+
+
+def is_done(ntrig, attack, dataset, iter, defense):
+    matches = find_experiment(ntrig, attack, dataset, iter, defense, after=None)
+    return len(matches) > 0
+
+
+def run_attack(ntrig, attack, dataset, model, iter):
+    global mode, log_folder
+    att_main_folder = f'data/attack/image/{dataset}/{model}/{attack}'
+    att_copy_folder = f'{log_folder}/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{iter}'
+    backup_folder = 'tests3/attacks/backup'
+    att_log_path = f"{log_folder}/{ntrig}/attack_{attack}_{dataset}_multirun5.txt"
+    os.makedirs(att_copy_folder, exist_ok=True)
+    os.makedirs(att_main_folder, exist_ok=True)
+    os.makedirs(backup_folder, exist_ok=True)
+
     extra = ''
     extra_ntoone = ''
     for i in range(ntrig - 1):  # first trigger is passed as mark not extra mark
         h, w = offsets[i]
         extra += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w}" '
         extra_ntoone += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w} mark_alpha={NTOONE_ALPHA}" '
-    probs = (str(1/(ntrig))+' ') * ntrig
+    probs = (str(1 / (ntrig)) + ' ') * ntrig
+
+    this_attack_args = attack_args[attack]
+    if attack == 'prob':
+        this_attack_args += '--probs ' + probs + extra
+    if attack == 'ntoone':
+        this_attack_args += ' ' + extra_ntoone
+
+    alpha = NTOONE_ALPHA if attack == 'ntoone' else 0.0
+
+    attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
+                 f"--dataset {dataset} --model {model} --attack {attack} " \
+                 f"--device cuda --epoch {attack_epoch} --save " \
+                 f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
+                 f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
+                 f"{this_attack_args} "
+    if attack == 'prob' and dataset == 'cifar':
+        attack_cmd += '--lr 0.001 '
+    if 'model' != 'net':
+        attack_cmd += '--pretrain '
+    attack_cmd += f">> {att_log_path} "
+
+    copy_dir(att_main_folder, backup_folder)
+
+    with open(att_log_path, 'a+') as f:
+        f.write(f'attack started. {get_time()}\n')
+    print(f'{get_time()}:\n{attack_cmd}\n')
+    exit_code = os.system(attack_cmd)  # will overwrite att_main_folder
+    if exit_code != 0:
+        exit(exit_code)
+    timestamp = get_time()
+    with open(att_log_path, 'a') as f:
+        f.write(f'attack finished. {timestamp}\n')
+    write_experiment(ntrig, attack, dataset, iter, '-', timestamp)
+
+    copy_dir(att_main_folder, att_copy_folder)
+
+    # restore backed up experiment
+    if mode == 'test':
+        copy_dir(backup_folder, att_main_folder)
+
+
+def run_defense(ntrig, attack, dataset, model, iter, defense):
+    global mode, log_folder
+    def_main_folder = f"data/defense/image/{dataset}/{model}/{defense}/{attack}"
+    def_copy_folder = f'{log_folder}/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{iter}'
+    backup_folder = 'tests3/defenses/backup'
+    def_log_path = f"{log_folder}/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt"
+    os.makedirs(def_main_folder, exist_ok=True)
+    os.makedirs(def_copy_folder, exist_ok=True)
+    os.makedirs(backup_folder, exist_ok=True)
+
+    extra = ''
+    extra_ntoone = ''
+    for i in range(ntrig - 1):  # first trigger is passed as mark not extra mark
+        h, w = offsets[i]
+        extra += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w}" '
+        extra_ntoone += f'--extra_mark "mark_path=square_white.png mark_height=3 mark_width=3 height_offset={h} width_offset={w} mark_alpha={NTOONE_ALPHA}" '
+    probs = (str(1 / (ntrig)) + ' ') * ntrig
+
+    this_attack_args = attack_args[attack]
+    if attack == 'prob':
+        this_attack_args += '--probs ' + probs + extra
+    if attack == 'ntoone':
+        this_attack_args += ' ' + extra_ntoone
+    alpha = NTOONE_ALPHA if attack == 'ntoone' else 0.0
+
+    # NB: batch size is not used in fulltest.py
+    defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
+                  f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
+                  f"--random_init --device cuda --save " \
+                  f"{this_attack_args} " \
+                  f"{defense_args[defense]} " \
+                  f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
+                  f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
+                  f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
+                  f">> {def_log_path} "
+
+    if mode == 'test':  # backup existing trial
+        copy_dir(def_main_folder, backup_folder)
+
+    with open(def_log_path, 'a+') as f:
+        f.write(f'defense started. {get_time()}\n')
+    print(f'{get_time()}:\n{defense_cmd}\n')
+    exit_code = os.system(defense_cmd)
+    if exit_code != 0:
+        exit(exit_code)
+    timestamp = get_time()
+    with open(def_log_path, 'a') as f:
+        f.write(f'defense finished. {timestamp}\n')
+    write_experiment(ntrig, attack, dataset, iter, defense, timestamp)
+
+    copy_dir(def_main_folder, def_copy_folder)
+
+    # restore backed up experiment
+    if mode == 'test':
+        copy_dir(backup_folder, def_main_folder)
+
+
+def run_experiments(experiments):
+    for experiment in experiments:
+        ntrig, attack, dataset, model, iter, defense = experiment
+        if defense is None:
+            defense = '-'
+        if defense == '-':
+            exp_type = 'attack'
+        else:
+            exp_type = 'defense'
+
+        if exp_type == 'attack':
+            if not find_experiment(ntrig, attack, dataset, iter, '-') or not skip_existing_trials:
+                run_attack(ntrig, attack, dataset, model, iter)
+            else:
+                print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
+        else:
+            if not find_experiment(ntrig, attack, dataset, iter, '-'):
+                print(f'{get_time()}: Note: attack did not exist, running now:\n')
+                run_attack(ntrig, attack, dataset, model, iter)
+            if not find_experiment(ntrig, attack, dataset, iter, defense) or not skip_existing_trials:
+                run_defense(ntrig, attack, dataset, model, iter, defense)
+            else:
+                print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
+
+
+def migrate():
+    # NB: this function was needed to be run only once. Also pay attention to experiment_log value
+    # copy records from old history file to new history.csv file
+    # setting 29/5/24 00:00 as timestamp
+    from datetime import datetime, time
+    # Get today's date
+    today = datetime.today().date()  # 29/05/2024
+    # Get the datetime for today at 00:00
+    midnight = datetime.combine(today, time())
+
+    with open('tests2/history', 'r') as f:
+        text = f.read()
+    lines = text.splitlines(keepends=False)
+    for line in lines:
+        words = line.split(' ')
+        exp_type, ntrig, attack, dataset, iter = words[:5]
+        if exp_type == 'defense':
+            defense = words[5]
+        else:
+            defense = '-'
+        write_experiment(ntrig, attack, dataset, iter, defense, midnight)
+
+
+if __name__ == "__main__":  # Create the parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mode', metavar='mode', type=str, help='real or test')
+    # Parse the arguments
+    args = parser.parse_args()
+    mode = args.mode
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
+
+    NTOONE_ALPHA = .2
+    attack_epoch = 100
+    defence_epoch = 50
+    num_trials = 10  # this is the number of trails per ntrig, attack, dataset.
+    # including the previous attacks. i.e. if n trials already done, num_trials-n will be done
+    skip_existing_trials = True  # if results exist for a trial, don't repeat it.
 
     attack_args = {
         'prob': '--cbeta_epoch 0 --losses loss1 loss2_11 loss3_11 --init_loss_weights 1.0 1.75 0.25 --poison_percent 0.1 '
-                '--probs ' + probs + extra,
+                '--probs ',
         'badnet': '',
-        'ntoone': ' ' + extra_ntoone,
+        'ntoone': ' ',
     }
 
-    datasets_models = [('cifar10', 'resnet18_comp'), ('mnist', 'net')]
+    defense_args = {'neural_cleanse': f'--nc_epoch {defence_epoch} ',
+                    'abs': '',
+                    'deep_inspect': f'--remask_epoch {defence_epoch} ',
+                    'tabor': f'--nc_epoch {defence_epoch} ',
+                    'neuron_inspect': '',
+                    'strip': '',
+                    'newstrip': '', }
+    offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
 
-    os.makedirs(f'tests2/{ntrig}/multitest_results', exist_ok=True)
+    attacks = ['ntoone', 'prob', 'badnet']
+    # defenses = ['neural_cleanse', 'tabor', 'neuron_inspect', 'abs']
+    defenses = ['newstrip']
+    datasets_models = [('mnist', 'net'), ('cifar10', 'resnet18_comp')]
+    trial_indexes = list(range(1, 2))
+    experiments = [(ntrig, attack, dataset, model, iter, defense)
+                   for ntrig in range(2, 3)
+                   for attack in attacks
+                   for dataset, model in datasets_models
+                   for iter in trial_indexes
+                   for defense in defenses
+                   ]
 
-    for attack in attacks:
-        for dataset, model in datasets_models:
-            for i in range(1, num_trials + 1):
-                att_respath = f'tests2/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{i}'
-                alpha = NTOONE_ALPHA if attack == 'ntoone' else 0.0
-                if not is_done(True, ntrig, attack, dataset, i) or not skip_existing_trials:
-                    attack_cmd = f"python ./examples/backdoor_attack.py --verbose 1 --batch_size 100 " \
-                                 f"--dataset {dataset} --model {model} --attack {attack} " \
-                                 f"--device cuda --epoch {attack_epoch} --save " \
-                                 f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
-                                 f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
-                                 f"{attack_args[attack]} " \
-
-                    if attack == 'prob' and dataset == 'cifar':
-                        attack_cmd += '--lr 0.001 '
-                    if 'model' != 'net':
-                        attack_cmd += '--pretrain '
-
-                    attack_cmd += f">> tests2/{ntrig}/attack_{attack}_{dataset}_multirun5.txt "
-
-                    exit_code = os.system(attack_cmd)
-                    if exit_code != 0:
-                        exit(exit_code)
-                    with open(f"tests2/{ntrig}/attack_{attack}_{dataset}_multirun5.txt", 'a') as f:
-                        f.write('attack finished.')
-                    with open('tests2/history', 'a+') as f:
-                        f.write(f'attack {ntrig} {attack} {dataset} {i}\n')
-
-                    os.makedirs(att_respath, exist_ok=True)
-                    for f in glob.glob(f'data/attack/image/{dataset}/{model}/{attack}/*'):
-                        # if not f.endswith('.pth'):
-                        shutil.copy(f, att_respath)
-                else:
-                    print('skipping attack')
-
-                for defense in defenses:
-                    def_respath = f'tests2/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{i}'
-                    if not is_done(False, ntrig, attack, dataset, i, defense) or not skip_existing_trials:
-                        # NB: batch size is not used in fulltest.py
-                        defense_cmd = f"python ./examples/backdoor_defense.py --verbose 1 " \
-                                      f"--dataset {dataset} --model {model} --attack {attack} --defense {defense} " \
-                                      f"--random_init --device cuda --save " \
-                                      f"{attack_args[attack]} " \
-                                      f"{defense_args[defense]} " \
-                                      f"--batch_size 50 --test_batch_size 1 --valid_batch_size 50 " \
-                                      f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
-                                      f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
-                                      f">> tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt "
-                        exit_code = os.system(defense_cmd)
-                        if exit_code != 0:
-                            exit(exit_code)
-                        with open(f"tests2/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt", 'a') as f:
-                            f.write('defense finished.')
-                        with open('tests2/history', 'a+') as f:
-                            f.write(f'defense {ntrig} {attack} {dataset} {i} {defense}\n')
-
-                        os.makedirs(def_respath, exist_ok=True)
-                        for f in glob.glob(f"data/defense/image/{dataset}/{model}/{defense}/{attack}_*"):
-                            shutil.copy(f, def_respath)
-                    else:
-                        print('skipping defense')
-
-
-for ntrig in range(2, 6):
-    trial(ntrig)
+    run_experiments(experiments)

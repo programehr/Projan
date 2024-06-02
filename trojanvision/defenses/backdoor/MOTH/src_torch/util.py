@@ -5,13 +5,13 @@ import torch
 
 from torchvision import datasets, models, transforms
 
-from dataset import CelebA_attr, GTSRB
-from network import resnet18
+from .dataset import CelebA_attr, GTSRB
+from .network import resnet18
 
 
 _mean = {
     'default':  [0.5   , 0.5   , 0.5   ],
-    'mnist':    [0.5   , 0.5   , 0.5   ],
+    'mnist':    [0.5],
     'cifar10':  [0.4914, 0.4822, 0.4465],
     'gtsrb':    [0.0   , 0.0   , 0.0   ],
     'celeba':   [0.0   , 0.0   , 0.0   ],
@@ -20,7 +20,7 @@ _mean = {
 
 _std = {
     'default':  [0.5   , 0.5   , 0.5   ],
-    'mnist':    [0.5   , 0.5   , 0.5   ],
+    'mnist':    [0.5],
     'cifar10':  [0.2471, 0.2435, 0.2616],
     'gtsrb':    [1.0   , 1.0   , 1.0   ],
     'celeba':   [1.0   , 1.0   , 1.0   ],
@@ -102,7 +102,7 @@ def get_dataloader(dataset, train=True, ratio=1.0, batch_size=128):
     if dataset == 'gtsrb':
         dataset = GTSRB(data_root, train, transform)
     elif dataset == 'mnist':
-        dataset = datasets.MNIST(data_root, train, transform, download=False)
+        dataset = datasets.MNIST(data_root, train, transform, download=True)
     elif dataset == 'cifar10':
         dataset = datasets.CIFAR10(data_root, train, transform, download=False)
     elif dataset == 'celeba':

@@ -4,7 +4,8 @@ import numpy as np
 import torch
 import sys
 
-from util import get_num, get_size, preprocess, deprocess
+from trojanzoo.utils import env
+from .util import get_num, get_size, preprocess, deprocess
 
 
 class Trigger:
@@ -22,7 +23,7 @@ class Trigger:
         self.batch_size = batch_size
         self.asr_bound = asr_bound
 
-        self.device = torch.device('cuda')
+        self.device = env['device']
         self.num_classes = get_num(dataset)
         self.img_rows, self.img_cols, self.img_channels = get_size(dataset)
 
@@ -224,16 +225,17 @@ class Trigger:
 
             # periodically print inversion results
             if step % 10 == 0:
-                sys.stdout.write('\rstep: {:3d}, attack: {:.2f}, loss: {:.2f}, '\
-                                    .format(step, avg_acc, avg_loss)
-                                 + 'ce: {:.2f}, reg: {:.2f}, reg_best: {:.2f}  '\
-                                    .format(avg_loss_ce, avg_loss_reg, reg_best))
-                sys.stdout.flush()
+                pass
+                # sys.stdout.write('\rstep: {:3d}, attack: {:.2f}, loss: {:.2f}, '\
+                #                     .format(step, avg_acc, avg_loss)
+                #                  + 'ce: {:.2f}, reg: {:.2f}, reg_best: {:.2f}  '\
+                #                     .format(avg_loss_ce, avg_loss_reg, reg_best))
+                # sys.stdout.flush()
 
-        sys.stdout.write('\x1b[2K')
-        sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
-                            .format(source, target, mask_best.abs().sum()))
-        sys.stdout.flush()
+        # sys.stdout.write('\x1b[2K')
+        # sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
+        #                     .format(source, target, mask_best.abs().sum()))
+        # sys.stdout.flush()
 
         # compute loss difference
         if source == self.num_classes and len(loss_ce_list) == attack_size:
@@ -262,7 +264,7 @@ class TriggerCombo:
         self.batch_size = batch_size
         self.asr_bound = asr_bound
 
-        self.device = torch.device('cuda')
+        self.device = env['device']
         self.img_rows, self.img_cols, self.img_channels = get_size(dataset)
 
         # hyper-parameters to dynamically adjust loss weight
@@ -479,23 +481,24 @@ class TriggerCombo:
 
             # periodically print inversion results
             if step % 10 == 0:
-                sys.stdout.write('\rstep: {:3d}, attack: ({:.2f}, {:.2f}), '\
-                                    .format(step, avg_acc[0], avg_acc[1])
-                                 + 'loss: ({:.2f}, {:.2f}), '\
-                                    .format(avg_loss[0], avg_loss[1])
-                                 + 'ce: ({:.2f}, {:.2f}), '\
-                                    .format(avg_loss_ce[0], avg_loss_ce[1])
-                                 + 'reg: ({:.2f}, {:.2f}), '\
-                                    .format(avg_loss_reg[0], avg_loss_reg[1])
-                                 + 'reg_best: ({:.2f}, {:.2f})  '\
-                                    .format(reg_best[0], reg_best[1]))
-                sys.stdout.flush()
+                pass
+                # sys.stdout.write('\rstep: {:3d}, attack: ({:.2f}, {:.2f}), '\
+                #                     .format(step, avg_acc[0], avg_acc[1])
+                #                  + 'loss: ({:.2f}, {:.2f}), '\
+                #                     .format(avg_loss[0], avg_loss[1])
+                #                  + 'ce: ({:.2f}, {:.2f}), '\
+                #                     .format(avg_loss_ce[0], avg_loss_ce[1])
+                #                  + 'reg: ({:.2f}, {:.2f}), '\
+                #                     .format(avg_loss_reg[0], avg_loss_reg[1])
+                #                  + 'reg_best: ({:.2f}, {:.2f})  '\
+                #                     .format(reg_best[0], reg_best[1]))
+                # sys.stdout.flush()
 
-        sys.stdout.write('\x1b[2K')
-        sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
-                            .format(source, target, mask_best[0].abs().sum()))
-        sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
-                            .format(target, source, mask_best[1].abs().sum()))
-        sys.stdout.flush()
+        # sys.stdout.write('\x1b[2K')
+        # sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
+        #                     .format(source, target, mask_best[0].abs().sum()))
+        # sys.stdout.write('\rmask norm of pair {:d}-{:d}: {:.2f}\n'\
+        #                     .format(target, source, mask_best[1].abs().sum()))
+        # sys.stdout.flush()
 
         return mask_best, pattern_best

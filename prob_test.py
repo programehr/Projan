@@ -8,6 +8,8 @@ import glob
 import argparse
 
 timeformat = '%Y-%m-%d %H:%M:%S'
+# Note: To avoid loss of data while opening history.csv with Excel use custom > yyyy-mm-dd hh:mm:ss format
+# (in Excel column data format)
 
 global mode, log_folder, experiment_log
 
@@ -20,9 +22,9 @@ def copy_dir(src_dir, dst_dir):
         shutil.copy(os.path.join(src_dir, filename), dst_dir)
 
 
-def write_experiment(ntrig, attack, dataset, iter, defense='-', timestamp=None):
+def write_experiment(ntrig, attack, dataset, model, iter, defense='-', timestamp=None):
     global experiment_log
-    experiment = [ntrig, attack, dataset, iter, defense]
+    experiment = [ntrig, attack, dataset, model, iter, defense]
     if defense == '-':
         exp_type = 'attack'
     else:
@@ -31,25 +33,25 @@ def write_experiment(ntrig, attack, dataset, iter, defense='-', timestamp=None):
         timestamp = get_time()
     record = [timestamp, exp_type] + experiment
     with open(experiment_log, 'a+', newline='') as f:
-        w = csv.writer(f, delimiter='\t')
+        w = csv.writer(f, delimiter=',')
         w.writerow(record)
 
 
 def read_experiments():
     global experiment_log
     with open(experiment_log, 'r', newline='') as f:
-        rd = csv.reader(f, delimiter='\t')
+        rd = csv.reader(f, delimiter=',')
         for recix, record in enumerate(rd):
-            timestamp, exp_type, ntrig, attack, dataset, iter, defense = record
+            timestamp, exp_type, ntrig, attack, dataset, model, iter, defense = record
             timestamp = datetime.strptime(timestamp, timeformat)
             ntrig = int(ntrig)
             iter = int(iter)
-            yield [timestamp, exp_type, ntrig, attack, dataset, iter, defense]
+            yield [timestamp, exp_type, ntrig, attack, dataset, model, iter, defense]
 
 
-def find_experiment(ntrig, attack, dataset, iter, defense, after=None):
+def find_experiment(ntrig, attack, dataset, model, iter, defense, after=None):
     exp_type = 'defense' if defense != '-' else 'attack'
-    experiment = [exp_type, ntrig, attack, dataset, iter, defense]
+    experiment = [exp_type, ntrig, attack, dataset, model, iter, defense]
     matches = []
     # experiment = [str(x) for x in experiment]
     for recix, record in enumerate(read_experiments()):
@@ -69,13 +71,13 @@ def remove_experiments(indexes):
     with open(experiment_log, 'w') as f:
         pass
     with open(experiment_log, 'a+', newline='') as f:
-        w = csv.writer(f, delimiter='\t')
+        w = csv.writer(f, delimiter=',')
         for ix, rec in enumerate(recs):
             w.writerow(rec)  # if you wanna use write_experiment be sure to pass timestamp
 
 
-def is_done(ntrig, attack, dataset, iter, defense):
-    matches = find_experiment(ntrig, attack, dataset, iter, defense, after=None)
+def is_done(ntrig, attack, dataset, model, iter, defense):
+    matches = find_experiment(ntrig, attack, dataset, model, iter, defense, after=None)
     return len(matches) > 0
 
 
@@ -119,16 +121,17 @@ def run_attack(ntrig, attack, dataset, model, iter):
 
     copy_dir(att_main_folder, backup_folder)
 
+    start_time = get_time()
     with open(att_log_path, 'a+') as f:
-        f.write(f'attack started. {get_time()}\n')
-    print(f'{get_time()}:\n{attack_cmd}\n')
+        f.write(f'attack started. {start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}\n')
+    print(f'{start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}\n{attack_cmd}\n')
     exit_code = os.system(attack_cmd)  # will overwrite att_main_folder
     if exit_code != 0:
         exit(exit_code)
-    timestamp = get_time()
+    end_time = get_time()
     with open(att_log_path, 'a') as f:
-        f.write(f'attack finished. {timestamp}\n')
-    write_experiment(ntrig, attack, dataset, iter, '-', timestamp)
+        f.write(f'attack finished. {start_time}\t{end_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}\n')
+    write_experiment(ntrig, attack, dataset, model, iter, '-', end_time)
 
     copy_dir(att_main_folder, att_copy_folder)
 
@@ -176,16 +179,17 @@ def run_defense(ntrig, attack, dataset, model, iter, defense):
     if mode == 'test':  # backup existing trial
         copy_dir(def_main_folder, backup_folder)
 
+    start_time = get_time()
     with open(def_log_path, 'a+') as f:
-        f.write(f'defense started. {get_time()}\n')
-    print(f'{get_time()}:\n{defense_cmd}\n')
+        f.write(f'defense started. {start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n')
+    print(f'{start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n{defense_cmd}\n')
     exit_code = os.system(defense_cmd)
     if exit_code != 0:
         exit(exit_code)
-    timestamp = get_time()
+    end_time = get_time()
     with open(def_log_path, 'a') as f:
-        f.write(f'defense finished. {timestamp}\n')
-    write_experiment(ntrig, attack, dataset, iter, defense, timestamp)
+        f.write(f'defense finished. {start_time}\t{end_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n')
+    write_experiment(ntrig, attack, dataset, model, iter, defense, end_time)
 
     copy_dir(def_main_folder, def_copy_folder)
 
@@ -205,15 +209,15 @@ def run_experiments(experiments):
             exp_type = 'defense'
 
         if exp_type == 'attack':
-            if not find_experiment(ntrig, attack, dataset, iter, '-') or not skip_existing_trials:
+            if not find_experiment(ntrig, attack, dataset, model, iter, '-') or not skip_existing_trials:
                 run_attack(ntrig, attack, dataset, model, iter)
             else:
                 print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
         else:
-            if not find_experiment(ntrig, attack, dataset, iter, '-'):
+            if not find_experiment(ntrig, attack, dataset, model, iter, '-'):
                 print(f'{get_time()}: Note: attack did not exist, running now:\n')
                 run_attack(ntrig, attack, dataset, model, iter)
-            if not find_experiment(ntrig, attack, dataset, iter, defense) or not skip_existing_trials:
+            if not find_experiment(ntrig, attack, dataset, model, iter, defense) or not skip_existing_trials:
                 run_defense(ntrig, attack, dataset, model, iter, defense)
             else:
                 print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
@@ -277,7 +281,8 @@ if __name__ == "__main__":  # Create the parser
                     'tabor': f'--nc_epoch {defence_epoch} ',
                     'neuron_inspect': '',
                     'strip': '',
-                    'newstrip': '', }
+                    'newstrip': '',
+                    'moth': '',}
     offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
 
     attacks = ['ntoone', 'prob', 'badnet']

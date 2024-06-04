@@ -22,6 +22,15 @@ def copy_dir(src_dir, dst_dir):
         shutil.copy(os.path.join(src_dir, filename), dst_dir)
 
 
+def delete_dir_contents(path):
+    for filename in os.listdir(path):
+        file_path = os.path.join(path, filename)
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+        elif os.path.isdir(file_path):
+            shutil.rmtree(file_path)
+
+
 def write_experiment(ntrig, attack, dataset, model, iter, defense='-', timestamp=None):
     global experiment_log
     experiment = [ntrig, attack, dataset, model, iter, defense]
@@ -83,8 +92,11 @@ def is_done(ntrig, attack, dataset, model, iter, defense):
 
 def run_attack(ntrig, attack, dataset, model, iter):
     global mode, log_folder
+    # used by trojanzoo to store latest trials results w/o regard to iter and ntrig
     att_main_folder = f'data/attack/image/{dataset}/{model}/{attack}'
+    # used by me to separately store trials by iter, ntrig
     att_copy_folder = f'{log_folder}/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{iter}'
+    # used in test mode to back up existing results
     backup_folder = 'tests3/attacks/backup'
     att_log_path = f"{log_folder}/{ntrig}/attack_{attack}_{dataset}_multirun5.txt"
     os.makedirs(att_copy_folder, exist_ok=True)
@@ -119,7 +131,9 @@ def run_attack(ntrig, attack, dataset, model, iter):
         attack_cmd += '--pretrain '
     attack_cmd += f">> {att_log_path} "
 
-    copy_dir(att_main_folder, backup_folder)
+    if mode == 'test':
+        delete_dir_contents(backup_folder)
+        copy_dir(att_main_folder, backup_folder)
 
     start_time = get_time()
     with open(att_log_path, 'a+') as f:
@@ -127,6 +141,11 @@ def run_attack(ntrig, attack, dataset, model, iter):
     print(f'{start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}\n{attack_cmd}\n')
     exit_code = os.system(attack_cmd)  # will overwrite att_main_folder
     if exit_code != 0:
+        # restore backed up experiment
+        # it could be used for real mode too, but the user may wanna stop the trial (thus non-zero exit code)
+        # and resume it later.
+        if mode == 'test':
+            copy_dir(backup_folder, att_main_folder)
         exit(exit_code)
     end_time = get_time()
     with open(att_log_path, 'a') as f:
@@ -142,8 +161,11 @@ def run_attack(ntrig, attack, dataset, model, iter):
 
 def run_defense(ntrig, attack, dataset, model, iter, defense):
     global mode, log_folder
+    # used by trojanzoo to store latest trials results w/o regard to iter and ntrig
     def_main_folder = f"data/defense/image/{dataset}/{model}/{defense}/{attack}"
+    # used by me to separately store trials by iter, ntrig
     def_copy_folder = f'{log_folder}/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{iter}'
+    # used in test mode to back up existing results
     backup_folder = 'tests3/defenses/backup'
     def_log_path = f"{log_folder}/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt"
     os.makedirs(def_main_folder, exist_ok=True)
@@ -177,14 +199,20 @@ def run_defense(ntrig, attack, dataset, model, iter, defense):
                   f">> {def_log_path} "
 
     if mode == 'test':  # backup existing trial
+        delete_dir_contents(backup_folder)
         copy_dir(def_main_folder, backup_folder)
 
     start_time = get_time()
     with open(def_log_path, 'a+') as f:
         f.write(f'defense started. {start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n')
     print(f'{start_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n{defense_cmd}\n')
-    exit_code = os.system(defense_cmd)
+    exit_code = os.system(defense_cmd)  # will overwrite def_main_folder
     if exit_code != 0:
+        # it could be used for real mode too, but the user may wanna stop the trial (thus non-zero exit code)
+        # and resume it later.
+        # restore backed up experiment
+        if mode == 'test':
+            copy_dir(backup_folder, def_main_folder)
         exit(exit_code)
     end_time = get_time()
     with open(def_log_path, 'a') as f:

@@ -349,6 +349,22 @@ class Prob(BadNet):
         #print(correct1.sum(), len(correct1), correct2.sum(), len(correct2), corrects.sum(), len(corrects))
         #print(100*correct2.sum()/len(correct2))
 
+        # check the ASR when all triggers used together
+        _, all_tgt_acc =  self.model._validate(print_prefix=f'Validate Combo Tgt',
+                                                 main_tag='valid combo tgt',
+                                                 get_data_fn=self.get_data, keep_org=False, poison_label=True,
+                                                 indent=indent,
+                                                 which=-1,  # important
+                                                 **kwargs)
+
+        # check the benign accuracy when all triggers used together
+        _, all_clean_acc =  self.model._validate(print_prefix=f'Validate Combo Clean',
+                                                 main_tag='valid combo org',
+                                                 get_data_fn=self.get_data, keep_org=True, poison_label=False,
+                                                 indent=indent,
+                                                 which=None,
+                                                 **kwargs)
+
         for j in range(self.nmarks):
             prints(f'Validate Confidence({j+1}): {self.validate_confidence(which=j):.3f}', indent=indent)
             prints(f'Neuron Jaccard Idx({j+1}): {self.check_neuron_jaccard(which=j):.3f}', indent=indent)
@@ -396,7 +412,11 @@ class Prob(BadNet):
             y[...] = self.target_class
             y = y.to(env['device'])
         if which is not None:
-            x = self.add_mark(x, which, **kwargs)
+            if which >= 0:
+                x = self.add_mark(x, which, **kwargs)
+            else:  # use negative value to apply all triggers together
+                for i in range(self.nmarks):
+                    x = self.add_mark(x, which=i, **kwargs)
         return x, y
 
 

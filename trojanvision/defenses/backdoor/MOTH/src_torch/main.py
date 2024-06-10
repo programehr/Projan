@@ -449,7 +449,6 @@ class MOTH(BackdoorDefense):
                 x_batch = x_adv.detach()
 
                 # train model
-                model.train()  # Note: this was not part of the MOTH repo code
                 optimizer.zero_grad()
                 output = model(x_batch)
                 loss = criterion(output, y_batch.to(env['device']))

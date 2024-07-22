@@ -468,6 +468,8 @@ def read_new_defense(p):
     acc_pat = r'''defense evaluation.*?Validate Clean.*?top1:\s*(\S*)'''
     if 'prob' in p:
         asr_pat = r'''defense evaluation.*?Validate .*?OR of \[Trigger Tgt\] on all triggers:\s*(\S*)'''
+    elif 'ntoone' in p:
+        asr_pat = r'''defense evaluation.*?Validate Comb.*? Tgt.*?top1:\s*(\S*)'''
     else:
         asr_pat = r'''defense evaluation.*?Validate Trigger Tgt.*?top1:\s*(\S*)'''
     chunks = re.split('env', text)

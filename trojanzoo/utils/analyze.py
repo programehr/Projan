@@ -489,6 +489,38 @@ def read_new_defense(p):
     return pre_acc, pre_asr, post_acc, post_asr
 
 
+def read_strip_defense_file(p):
+    results = []
+    with open(p, 'r') as f:
+        text = f.read()
+    chunks = text.split('env')
+    chunks = [t for t in chunks if t.strip() != '']
+    chunks = [t for t in chunks if 'defense finished.' in t]  # remove incomplete trials
+    chunks = [t for t in chunks if 'attack success rate: ' in t]
+    for chunk in chunks:
+        result = read_strip_defense(chunk)
+        results.append(result)
+    return results
+
+
+def read_strip_defense(t):
+    asr_pat = r'attack success rate: (\S*)'
+    dsr_pat = r'defense success rate: (\S*)'
+    trojan_mean_pat = r'trojan mean, std: \((.*?),'
+    trojan_std_pat = r'trojan mean, std: \(.*?, (.*?)\)'
+    benign_mean_pat = r'benign mean, std: \((.*?),'
+    benign_std_pat = r'benign mean, std: \(.*?, (.*?)\)'
+    threshold_pat = r'threshold: (\S*)'
+    asr = float(re.findall(asr_pat, t)[0])
+    dsr = float(re.findall(dsr_pat, t)[0])
+    trojan_mean = float(re.findall(trojan_mean_pat, t)[0])
+    trojan_std = float(re.findall(trojan_std_pat, t)[0])
+    benign_mean = float(re.findall(benign_mean_pat, t)[0])
+    benign_std = float(re.findall(benign_std_pat, t)[0])
+    threshold = float(re.findall(threshold_pat, t)[0])
+    return asr, dsr, trojan_mean, trojan_std, benign_mean, benign_std, threshold
+
+
 '''
 from matplotlib import pyplot as plt
 

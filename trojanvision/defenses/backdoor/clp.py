@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from IBAU.defense import MappedDataset
-from trojanvision.defenses import BackdoorDefense
+from ..backdoor_defense import BackdoorDefense
 # from CLP.test import *
 from CLP.test import CLP as clp_alg, val
 from trojanzoo.utils.data import split_dataset

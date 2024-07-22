@@ -345,8 +345,11 @@ if __name__ == "__main__":  # Create the parser
                     'tabor': f'--nc_epoch {defence_epoch} ',
                     'neuron_inspect': '',
                     'strip': '',
-                    'newstrip': '',
-                    'moth': '',}
+                    'newstrip': '--strict_test ',
+                    'moth': '',
+                    'clp': '--clp_batch_size 500 --clp_u 3. ',
+                    'check_confidence': '',
+                    }
     offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
 
     attacks = ['ntoone', 'prob', 'badnet']

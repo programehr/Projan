@@ -11,7 +11,6 @@ timeformat = '%Y-%m-%d %H:%M:%S'
 # Note: To avoid loss of data while opening history.csv with Excel use custom > yyyy-mm-dd hh:mm:ss format
 # (in Excel column data format)
 
-global mode, log_folder, experiment_log
 
 def get_time():
     return datetime.now().strftime(timeformat)
@@ -31,8 +30,15 @@ def delete_dir_contents(path):
             shutil.rmtree(file_path)
 
 
-def write_experiment(ntrig, attack, dataset, model, iter, defense='-', timestamp=None):
-    global experiment_log
+def write_experiment(ntrig, attack, dataset, model, iter, defense='-', timestamp=None, mode='test'):
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
     experiment = [ntrig, attack, dataset, model, iter, defense]
     if defense == '-':
         exp_type = 'attack'
@@ -46,8 +52,15 @@ def write_experiment(ntrig, attack, dataset, model, iter, defense='-', timestamp
         w.writerow(record)
 
 
-def read_experiments():
-    global experiment_log
+def read_experiments(mode='test'):
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
     with open(experiment_log, 'r', newline='') as f:
         rd = csv.reader(f, delimiter=',')
         for recix, record in enumerate(rd):
@@ -58,12 +71,12 @@ def read_experiments():
             yield [timestamp, exp_type, ntrig, attack, dataset, model, iter, defense]
 
 
-def find_experiment(ntrig, attack, dataset, model, iter, defense, after=None):
+def find_experiment(ntrig, attack, dataset, model, iter, defense, after=None, mode='test'):
     exp_type = 'defense' if defense != '-' else 'attack'
     experiment = [exp_type, ntrig, attack, dataset, model, iter, defense]
     matches = []
     # experiment = [str(x) for x in experiment]
-    for recix, record in enumerate(read_experiments()):
+    for recix, record in enumerate(read_experiments(mode)):
         rec_timestamp = record[0]
         if record[1:] == experiment:
             if after is None or rec_timestamp > after:
@@ -71,10 +84,17 @@ def find_experiment(ntrig, attack, dataset, model, iter, defense, after=None):
     return matches
 
 
-def remove_experiments(indexes):
-    global experiment_log
+def remove_experiments(indexes, mode='test'):
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
     recs = []
-    for ix, rec in enumerate(read_experiments()):
+    for ix, rec in enumerate(read_experiments(mode)):
         if ix not in indexes:
             recs.append(rec)
     with open(experiment_log, 'w') as f:
@@ -85,13 +105,20 @@ def remove_experiments(indexes):
             w.writerow(rec)  # if you wanna use write_experiment be sure to pass timestamp
 
 
-def is_done(ntrig, attack, dataset, model, iter, defense):
-    matches = find_experiment(ntrig, attack, dataset, model, iter, defense, after=None)
+def is_done(ntrig, attack, dataset, model, iter, defense, mode='test'):
+    matches = find_experiment(ntrig, attack, dataset, model, iter, defense, after=None, mode=mode)
     return len(matches) > 0
 
 
-def run_attack(ntrig, attack, dataset, model, iter):
-    global mode, log_folder
+def run_attack(ntrig, attack, dataset, model, iter, mode='test'):
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
     # used by trojanzoo to store latest trials results w/o regard to iter and ntrig
     att_main_folder = f'data/attack/image/{dataset}/{model}/{attack}'
     # used by me to separately store trials by iter, ntrig
@@ -150,7 +177,7 @@ def run_attack(ntrig, attack, dataset, model, iter):
     end_time = get_time()
     with open(att_log_path, 'a') as f:
         f.write(f'attack finished. {start_time}\t{end_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}\n')
-    write_experiment(ntrig, attack, dataset, model, iter, '-', end_time)
+    write_experiment(ntrig, attack, dataset, model, iter, '-', end_time, mode)
 
     copy_dir(att_main_folder, att_copy_folder)
 
@@ -159,8 +186,15 @@ def run_attack(ntrig, attack, dataset, model, iter):
         copy_dir(backup_folder, att_main_folder)
 
 
-def run_defense(ntrig, attack, dataset, model, iter, defense):
-    global mode, log_folder
+def run_defense(ntrig, attack, dataset, model, iter, defense, mode='test'):
+    if mode == 'real':
+        log_folder = 'tests2'
+    elif mode == 'test':
+        log_folder = 'tests3'
+    else:
+        raise ValueError('undefined mode.')
+
+    experiment_log = f'{log_folder}/history.csv'
     # used by trojanzoo to store latest trials results w/o regard to iter and ntrig
     def_main_folder = f"data/defense/image/{dataset}/{model}/{defense}/{attack}"
     # used by me to separately store trials by iter, ntrig
@@ -216,8 +250,9 @@ def run_defense(ntrig, attack, dataset, model, iter, defense):
         exit(exit_code)
     end_time = get_time()
     with open(def_log_path, 'a') as f:
-        f.write(f'defense finished. {start_time}\t{end_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n')
-    write_experiment(ntrig, attack, dataset, model, iter, defense, end_time)
+        f.write(
+            f'defense finished. {start_time}\t{end_time}\n{ntrig}, {attack}, {dataset}, {model}, {iter}, {defense}\n')
+    write_experiment(ntrig, attack, dataset, model, iter, defense, end_time, mode)
 
     copy_dir(def_main_folder, def_copy_folder)
 
@@ -226,7 +261,7 @@ def run_defense(ntrig, attack, dataset, model, iter, defense):
         copy_dir(backup_folder, def_main_folder)
 
 
-def run_experiments(experiments):
+def run_experiments(experiments, mode='test'):
     for experiment in experiments:
         ntrig, attack, dataset, model, iter, defense = experiment
         if defense is None:
@@ -237,22 +272,24 @@ def run_experiments(experiments):
             exp_type = 'defense'
 
         if exp_type == 'attack':
-            if not find_experiment(ntrig, attack, dataset, model, iter, '-') or not skip_existing_trials:
-                run_attack(ntrig, attack, dataset, model, iter)
+            if not find_experiment(ntrig, attack, dataset, model, iter, '-', after=None,
+                                   mode=mode) or not skip_existing_trials:
+                run_attack(ntrig, attack, dataset, model, iter, mode)
             else:
                 print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
         else:
-            if not find_experiment(ntrig, attack, dataset, model, iter, '-'):
+            if not find_experiment(ntrig, attack, dataset, model, iter, '-', after=None, mode=mode):
                 print(f'{get_time()}: Note: attack did not exist, running now:\n')
-                run_attack(ntrig, attack, dataset, model, iter)
-            if not find_experiment(ntrig, attack, dataset, model, iter, defense) or not skip_existing_trials:
-                run_defense(ntrig, attack, dataset, model, iter, defense)
+                run_attack(ntrig, attack, dataset, model, iter, mode)
+            if not find_experiment(ntrig, attack, dataset, model, iter, defense, after=None,
+                                   mode=mode) or not skip_existing_trials:
+                run_defense(ntrig, attack, dataset, model, iter, defense, mode)
             else:
                 print(f'{get_time()}: skipping {exp_type}: {experiment}\n')
 
 
-def migrate():
-    # NB: this function was needed to be run only once. Also pay attention to experiment_log value
+def migrate(mode='test'):
+    # NB: this function was needed to be run only once. Also pay attention to the mode argument
     # copy records from old history file to new history.csv file
     # setting 29/5/24 00:00 as timestamp
     from datetime import datetime, time
@@ -279,15 +316,7 @@ if __name__ == "__main__":  # Create the parser
     parser.add_argument('mode', metavar='mode', type=str, help='real or test')
     # Parse the arguments
     args = parser.parse_args()
-    mode = args.mode
-    if mode == 'real':
-        log_folder = 'tests2'
-    elif mode == 'test':
-        log_folder = 'tests3'
-    else:
-        raise ValueError('undefined mode.')
-
-    experiment_log = f'{log_folder}/history.csv'
+    run_mode = args.mode
 
     NTOONE_ALPHA = .2
     attack_epoch = 100
@@ -327,3 +356,4 @@ if __name__ == "__main__":  # Create the parser
                    ]
 
     run_experiments(experiments)
+    run_experiments(experiments, run_mode)

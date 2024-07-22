@@ -40,9 +40,10 @@ class_dict = {
     'image_transform': ImageTransform,
     'magnet': MagNet,
 
-    'ibau': IBAU,
+    # 'ibau': IBAU,
     'clp': CLP,
-    'nad': NAD
+    # 'nad': NAD,
+    # 'absr4': ABSR4,
     'moth': MOTH,
     'check_model': CheckModel,
 }

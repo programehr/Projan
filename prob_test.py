@@ -299,9 +299,10 @@ def migrate(mode='test'):
     # setting 29/5/24 00:00 as timestamp
     from datetime import datetime, time
     # Get today's date
-    today = datetime.today().date()  # 29/05/2024
+    # today = datetime.today().date()  # 29/05/2024
+    theday = datetime.strptime("29/05/2024", "%d/%m/%Y")
     # Get the datetime for today at 00:00
-    midnight = datetime.combine(today, time())
+    midnight = datetime.combine(theday, time())
 
     with open('tests2/history', 'r') as f:
         text = f.read()

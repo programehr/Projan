@@ -474,19 +474,16 @@ def read_new_defense(p):
     del chunks[0]
     pre_acc, pre_asr, post_acc, post_asr = [], [], [], []
     for i, chunk in enumerate(chunks):
-        t = re.findall('pre-' + acc_pat, chunk, re.DOTALL)
-        assert len(t) == 1
-        pre_acc.append(float(t[0]))
-        t = re.findall('pre-' + asr_pat, chunk, re.DOTALL)
-        assert len(t) == 1
-        pre_asr.append(float(t[0]))
-
-        t = re.findall('post-' + acc_pat, chunk, re.DOTALL)
-        assert len(t) == 1
-        post_acc.append(float(t[0]))
-        t = re.findall('post-' + asr_pat, chunk, re.DOTALL)
-        assert len(t) == 1
-        post_asr.append(float(t[0]))
+        t0 = re.findall('pre-' + acc_pat, chunk, re.DOTALL)
+        t1 = re.findall('pre-' + asr_pat, chunk, re.DOTALL)
+        t2 = re.findall('post-' + acc_pat, chunk, re.DOTALL)
+        t3 = re.findall('post-' + asr_pat, chunk, re.DOTALL)
+        if len(t0) != 1 or len(t1) != 1 or len(t2) != 1 or len(t3) != 1:
+            continue
+        pre_acc.append(float(t0[0]))
+        pre_asr.append(float(t1[0]))
+        post_acc.append(float(t2[0]))
+        post_asr.append(float(t3[0]))
     return pre_acc, pre_asr, post_acc, post_asr
 
 

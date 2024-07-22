@@ -59,16 +59,16 @@ def analyze_attack_file(p):
     res = []
     for chunk in chunks:
         if attack in multi_trig_attacks:
-            res0 = analyze_prob_attack(chunk)
+            res0 = analyze_multi_trigger_attack(chunk)
         else:
-            res0 = analyze_non_prob_attack(chunk)
+            res0 = analyze_single_trigger_attack(chunk)
         if res0 is not None:
             res.append(res0)
 
     return res
 
 
-def analyze_prob_attack(t):
+def analyze_multi_trigger_attack(t):
     result = {}
     res = re.findall(r'Validate Trigger\((\d*)\)', t, re.DOTALL | re.IGNORECASE)
     res = [int(x) for x in res]
@@ -126,7 +126,7 @@ def analyze_prob_attack(t):
     return result
 
 
-def analyze_non_prob_attack(t):
+def analyze_single_trigger_attack(t):
     result = {}
     best_starts = [x.start(0) for x in re.finditer('best result', t)]
     if len(best_starts) > 0:
@@ -462,7 +462,7 @@ def fix_deep_inspect(inpath, outpath=None):
         f.write(out_text)
 
 
-def read_new_defense(p):
+def read_model_sanit_defense_file(p):
     with open(p, 'r') as f:
         text = f.read()
     acc_pat = r'''defense evaluation.*?Validate Clean.*?top1:\s*(\S*)'''

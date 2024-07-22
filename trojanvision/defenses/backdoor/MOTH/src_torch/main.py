@@ -2,6 +2,8 @@
 
 import warnings
 
+from torch.utils.data import DataLoader
+
 from trojanvision.defenses import BackdoorDefense
 from trojanzoo.utils import env
 
@@ -49,7 +51,17 @@ class MOTH(BackdoorDefense):
 
     def detect(self, **kwargs):
         super().detect(**kwargs)
+        test_set = self.dataset.get_dataset('valid')
+        loader = DataLoader(test_set)
+        if hasattr(self.attack, 'validate_fn'):
+            print('pre-defense evaluation')
+            self.attack.validate_fn(loader=loader)
+
         self.moth()
+
+        if hasattr(self.attack, 'validate_fn'):
+            print('post-defense evaluation')
+            self.attack.validate_fn(loader=loader)
 
     def moth(self):
         # assisting variables/parameters

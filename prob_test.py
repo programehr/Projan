@@ -308,7 +308,8 @@ def migrate(mode='test'):
             defense = words[5]
         else:
             defense = '-'
-        write_experiment(ntrig, attack, dataset, iter, defense, midnight)
+        model = 'net' if dataset == 'mnist' else 'resnet18_comp'
+        write_experiment(ntrig, attack, dataset, model, iter, defense, timestamp=midnight, mode=mode)
 
 
 if __name__ == "__main__":  # Create the parser
@@ -355,5 +356,12 @@ if __name__ == "__main__":  # Create the parser
                    for defense in defenses
                    ]
 
-    run_experiments(experiments)
+    experiments = [(ntrig, 'prob', dataset, model, 1, 'check_confidence')
+                   for ntrig in range(2, 6)
+                   for dataset, model in datasets_models] + \
+                  [(2, 'badnet', dataset, model, 1, 'check_confidence')
+                   for dataset, model in datasets_models] + \
+                  [(4, 'ntoone', dataset, model, 1, 'check_confidence')
+                   for dataset, model in datasets_models]
+
     run_experiments(experiments, run_mode)

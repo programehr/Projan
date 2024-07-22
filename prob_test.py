@@ -197,8 +197,10 @@ def run_defense(ntrig, attack, dataset, model, iter, defense, mode='test'):
     experiment_log = f'{log_folder}/history.csv'
     # used by trojanzoo to store latest trials results w/o regard to iter and ntrig
     def_main_folder = f"data/defense/image/{dataset}/{model}/{defense}/{attack}"
+    att_main_folder = f'data/attack/image/{dataset}/{model}/{attack}'
     # used by me to separately store trials by iter, ntrig
     def_copy_folder = f'{log_folder}/{ntrig}/multitest_results/defenses/{defense}-{attack}-{dataset}-{iter}'
+    att_copy_folder = f'{log_folder}/{ntrig}/multitest_results/attacks/{attack}-{dataset}-{iter}'
     # used in test mode to back up existing results
     backup_folder = 'tests3/defenses/backup'
     def_log_path = f"{log_folder}/{ntrig}/defense_{defense}_attack_{attack}_{dataset}_multirun5.txt"
@@ -231,6 +233,9 @@ def run_defense(ntrig, attack, dataset, model, iter, defense, mode='test'):
                   f"--mark_path square_white.png --mark_height 3 --mark_width 3 " \
                   f"--height_offset 2 --width_offset 2 --mark_alpha {alpha} " \
                   f">> {def_log_path} "
+
+    # copy target attack to the folder considered by defense
+    copy_dir(att_copy_folder, att_main_folder)
 
     if mode == 'test':  # backup existing trial
         delete_dir_contents(backup_folder)

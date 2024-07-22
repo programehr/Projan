@@ -10,6 +10,7 @@ from numpy import array as npa
 from trojanzoo.utils.extract_images import load_masked_mark
 from trojanzoo.utils.miscellaneous import outlier_ix, outlier_ix_val
 
+multi_trig_attacks = ['prob', 'ntoone']
 
 def analyze_folder(fol, target):
     defpaths = [os.path.join(fol, x) for x in os.listdir(fol) if x.startswith('defense')]
@@ -41,13 +42,15 @@ def analyze_attack_file(p):
         file path
     Returns
     -------
-    array
-        n x (ntrig+2) matrix. each row corresponds to one run of experiment.
-        first column: clean acc.
-        column 1 ... ntrig: target acc for each trigger
-        last column: OR of results
-        for non-prob attacks, we have 3 columns and 2nd and 3rd columns are equal.
+    List
+        one dict element per trial. Each dict may have the following fields:
+        'clean': clean acc
+        'asr': scalar or array (for prob and ntoone) of per-trigger ASRs
+        'or': or of results (for prob)
+        'comb': combination of all triggers (for ntoone and possibly prob)
     """
+    matches = re.findall('attack_(.*)_(.*)_.*', p)
+    attack, dataset = matches[0]
     with open(p, 'r') as f:
         text = f.read()
     chunks = text.split('env')
@@ -55,18 +58,18 @@ def analyze_attack_file(p):
     chunks = [t for t in chunks if 'attack finished.' in t]  # remove incomplete trials
     res = []
     for chunk in chunks:
-        if 'prob' in p:
+        if attack in multi_trig_attacks:
             res0 = analyze_prob_attack(chunk)
         else:
             res0 = analyze_non_prob_attack(chunk)
-        r, best_index = res0
-        if best_index is not None:
-            res.append(r[best_index])
+        if res0 is not None:
+            res.append(res0)
 
-    return npa(res)
+    return res
 
 
 def analyze_prob_attack(t):
+    result = {}
     res = re.findall(r'Validate Trigger\((\d*)\)', t, re.DOTALL | re.IGNORECASE)
     res = [int(x) for x in res]
     ntrig = max(res)
@@ -79,22 +82,26 @@ def analyze_prob_attack(t):
 
     res = re.findall(r'Results on the validation.*\n.*top1: (\S*)', t)
     res0 = [float(r) for r in res]
+    if len(res0) == 0:
+        return None
     res = re.finditer(r'Results on the validation.*\n.*top1: (\S*)', t)
     starts = []  # start of all results parts
     if best_start is None:
         best_index = None
+        return None
     else:
         for i, r in enumerate(res):
             start = r.start(0)
             if start < best_start:
                 best_index = i
-
-    ress = []
+    clean = res0[best_index]
+    result['clean'] = clean
+    asr = []
     for i in range(1, ntrig + 1):
         res = re.findall(rf'Results on the validation.*?\n.*?Validate Trigger\({i}\) Tgt.*?top1: (\S*)', t, re.DOTALL)
         res1 = [float(r) for r in res]
-        ress.append(res1)
-
+        asr.append(res1[best_index])
+    result['asr'] = asr
     # resor = re.findall(r'Results on the validation.*?\n.*?OR of \[Trigger Tgt\] on all triggers:  tensor\((.*?),', t,
     #                    re.DOTALL)
     # resor = re.findall(r'Results on the validation.*?\n.*?OR of \[Trigger Tgt\] on all triggers:\s*(\S*)', t,
@@ -103,17 +110,24 @@ def analyze_prob_attack(t):
     resor = re.findall(r'Results on the validation.*?\n.*?OR of \[Trigger Tgt\] on all triggers:[^\d\.]*([\d\.]*)', t,
                        re.DOTALL)
     resor = [float(r) for r in resor]
+    if len(resor) != 0:
+        result['or'] = resor[best_index]
 
-    resa = [res0]
-    for r in ress:
-        resa.append(r)
-    resa.append(resor)
+    rescomb_tgt = re.findall(r'Results on the validation.*?\n.*?Validate Comb.*? Tgt.*?top1:[^\d\.]*([\d\.]*)', t,
+                                re.DOTALL)
+    rescomb_tgt = [float(r) for r in rescomb_tgt]
+    if len(rescomb_tgt) != 0:
+        result['comb'] = rescomb_tgt[best_index]
+    # the following one is not an important indicator
+    rescomb_clean = re.findall(r'Results on the validation.*?\n.*?Validate Comb.*? Clean.*?top1:[^\d\.]*([\d\.]*)', t,
+                                re.DOTALL)
+    rescomb_clean = [float(r) for r in rescomb_clean]
 
-    resa = npa(resa)
-    return resa.transpose(), best_index
+    return result
 
 
 def analyze_non_prob_attack(t):
+    result = {}
     best_starts = [x.start(0) for x in re.finditer('best result', t)]
     if len(best_starts) > 0:
         best_start = best_starts[-1]
@@ -126,21 +140,20 @@ def analyze_non_prob_attack(t):
     starts = []  # start of all results parts
     if best_start is None:
         best_index = None
+        return None
     else:
         for i, r in enumerate(res):
             start = r.start(0)
             if start < best_start:
                 best_index = i
+    result['clean'] = res0[best_index]
 
     res = re.findall(r'Validate Trigger Tgt.*top1: (\S*)', t)
     res1 = [float(r) for r in res]
+    result['asr'] = res1[best_index]
+    result['or'] = res1[best_index]
 
-    resor = res1.copy()
-
-    resa = [res0, res1, resor]
-
-    resa = npa(resa)
-    return resa.transpose(), best_index
+    return result
 
 
 def analyze_defense_files(paths, target):

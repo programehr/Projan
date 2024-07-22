@@ -44,6 +44,7 @@ class_dict = {
     'clp': CLP,
     'nad': NAD
     'moth': MOTH,
+    'check_model': CheckModel,
 }
 
 

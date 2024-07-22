@@ -348,7 +348,7 @@ if __name__ == "__main__":  # Create the parser
                     'newstrip': '--strict_test ',
                     'moth': '',
                     'clp': '--clp_batch_size 500 --clp_u 3. ',
-                    'check_confidence': '',
+                    'check_model': '',
                     }
     offsets = [(10, 10), (17, 17), (2, 10), (10, 2)]
 
@@ -365,12 +365,12 @@ if __name__ == "__main__":  # Create the parser
                    for defense in defenses
                    ]
 
-    experiments = [(ntrig, 'prob', dataset, model, 1, 'check_confidence')
+    experiments = [(ntrig, 'prob', dataset, model, 1, 'check_model')
                    for ntrig in range(2, 6)
                    for dataset, model in datasets_models] + \
-                  [(2, 'badnet', dataset, model, 1, 'check_confidence')
+                  [(2, 'badnet', dataset, model, 1, 'check_model')
                    for dataset, model in datasets_models] + \
-                  [(4, 'ntoone', dataset, model, 1, 'check_confidence')
+                  [(4, 'ntoone', dataset, model, 1, 'check_model')
                    for dataset, model in datasets_models]
 
     run_experiments(experiments, run_mode)

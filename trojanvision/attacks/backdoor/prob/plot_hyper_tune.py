@@ -3,20 +3,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from trojanzoo.utils.analyze import analyze_attack_file
-
-p = r'E:\Mehrin\IPM\trojanzoo\gridsearch4.txt'
+# Note: the path must follow attack_<attack>_<ds>_*.txt
+# and must have 'attack finished' at the end of each trial.
+p = r'E:\Mehrin\IPM\trojanzoo\attack_prob_mnist_gridsearch4.txt'
 res = analyze_attack_file(p)
-ntrig = res.shape[1] - 2
+ntrig = len(res[0]['asr'])
 ix = 0
-res2 = np.zeros((10, 10, ntrig + 2))
-for i in range(10):
-    for j in range(10):
-        res2[i, j, :] = res[ix, :]
+res2 = np.zeros((8, 8, ntrig + 2))
+for i in range(8):
+    for j in range(8):
+        res2[i, j, :] = [res[ix]['clean']] + res[ix]['asr'] + [res[ix]['or']]
         ix += 1
 
-res3 = np.zeros((10, 10, 4))
-for i in range(10):
-    for j in range(10):
+res3 = np.zeros((8, 8, 4))
+for i in range(8):
+    for j in range(8):
         res3[i, j, 0] = res2[i, j, 0]
 
         res3[i, j, 1] = res2[i, j, 1:ntrig + 1].min()

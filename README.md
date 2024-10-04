@@ -1,5 +1,5 @@
-# ProbTrojan
-A probabilistic trojaning (backdoor) attack on deep networks.
+# Projan
+The code for the paper [Projan: A probabilistic trojan attack on deep neural networks](https://authors.elsevier.com/a/1jtRK3OAb9C%7E-T).
 
 It is based on version 1.0.8 of the [Trojanzoo](https://github.com/ain-soph/trojanzoo) framework,
 which has been forked for this project.
@@ -49,3 +49,17 @@ For a list of losses refer to [losses.py](./trojanvision/attacks/backdoor/prob/l
 We used `loss1 loss2_11 loss3_11` in the paper.
 
 For an example of the ProbTrojan attack, see [prob_test.py](./prob_test.py).
+
+# How to Cite
+If you happen to use this repository, please kindly cite our paper as follows:<br>
+@article{SAREMI2024112565,<br>
+title = {Projan: A probabilistic trojan attack on deep neural networks},<br>
+journal = {Knowledge-Based Systems},<br>
+volume = {304},<br>
+pages = {112565},<br>
+year = {2024},<br>
+issn = {0950-7051},<br>
+doi = {https://doi.org/10.1016/j.knosys.2024.112565}, <br>
+url = {https://www.sciencedirect.com/science/article/pii/S0950705124011997}, <br>
+author = {Mehrin Saremi and Mohammad Khalooei and Razieh Rastgoo and Mohammad Sabokrou} <br>
+}

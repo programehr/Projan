@@ -52,14 +52,16 @@ For an example of the ProbTrojan attack, see [prob_test.py](./prob_test.py).
 
 # How to Cite
 If you happen to use this repository, please kindly cite our paper as follows:<br>
-@article{SAREMI2024112565,<br>
-title = {Projan: A probabilistic trojan attack on deep neural networks},<br>
-journal = {Knowledge-Based Systems},<br>
-volume = {304},<br>
-pages = {112565},<br>
-year = {2024},<br>
-issn = {0950-7051},<br>
-doi = {https://doi.org/10.1016/j.knosys.2024.112565}, <br>
-url = {https://www.sciencedirect.com/science/article/pii/S0950705124011997}, <br>
-author = {Mehrin Saremi and Mohammad Khalooei and Razieh Rastgoo and Mohammad Sabokrou} <br>
+```bibtex
+@article{SAREMI2024112565,
+  title = {Projan: A probabilistic trojan attack on deep neural networks},
+  journal = {Knowledge-Based Systems},
+  volume = {304},
+  pages = {112565},
+  year = {2024},
+  issn = {0950-7051},
+  doi = {https://doi.org/10.1016/j.knosys.2024.112565},
+  url = {https://www.sciencedirect.com/science/article/pii/S0950705124011997},
+  author = {Mehrin Saremi and Mohammad Khalooei and Razieh Rastgoo and Mohammad Sabokrou}
 }
+```
